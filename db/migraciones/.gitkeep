@@ -1,0 +1,5 @@
+# Migraciones aditivas numeradas: 0001_descripcion.sql, 0002_...
+# Se aplican manualmente contra el contenedor de la BD, por ejemplo:
+#   docker exec -i mlsiesa_db psql -U <usuario> -d <nombre> < db/migraciones/0002_algo.sql
+# Reglas: solo ADD COLUMN IF NOT EXISTS / CREATE TABLE IF NOT EXISTS.
+# Nunca DROP/DELETE/TRUNCATE en produccion sin respaldo previo.

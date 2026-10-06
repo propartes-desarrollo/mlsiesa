@@ -1,0 +1,60 @@
+# ================================================================
+# mlsiesa - Frontend (Nginx) + Backend (Node) + PostgreSQL
+# App mlsiesa: Mercado Libre -> SIESA
+# ================================================================
+services:
+  mlsiesa_db:
+    image: postgres:16-alpine
+    container_name: mlsiesa_db
+    environment:
+      POSTGRES_USER: ${DB_USUARIO}
+      POSTGRES_PASSWORD: ${DB_CONTRASENA}
+      POSTGRES_DB: ${DB_NOMBRE}
+    volumes:
+      - mlsiesa_datos:/var/lib/postgresql/data
+      # El esquema se aplica SOLO en la primera creación (volumen vacío)
+      - ./db/esquema.sql:/docker-entrypoint-initdb.d/01_esquema.sql:ro
+    networks: [red_mlsiesa]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USUARIO} -d ${DB_NOMBRE}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mlsiesa_backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: mlsiesa_backend
+    env_file: ./backend/.env
+    environment:
+      TZ: America/Bogota   # las fechas del reporte de ML son hora de Colombia
+    expose:
+      - "3001"
+    networks: [red_mlsiesa]
+    depends_on:
+      mlsiesa_db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  mlsiesa_frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        VITE_API_URL: ""
+    container_name: mlsiesa_frontend
+    depends_on: [mlsiesa_backend]
+    networks: [red_mlsiesa, proxy_red_compartida]
+    restart: unless-stopped
+
+volumes:
+  mlsiesa_datos:
+
+networks:
+  red_mlsiesa:
+  # Red compartida con Nginx Proxy Manager. En el servidor ya existe.
+  # Para pruebas locales, créala una vez: docker network create proxy_red_compartida
+  proxy_red_compartida:
+    external: true

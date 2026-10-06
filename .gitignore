@@ -1,0 +1,30 @@
+# Dependencias
+node_modules/
+
+# Variables de entorno (CONTIENEN SECRETOS)
+.env
+.env.local
+.env.*.local
+
+# Build del frontend
+frontend/dist/
+
+# Logs
+backend/logs/
+*.log
+
+# Sistema / editores
+.DS_Store
+.vscode/
+.idea/
+*.swp
+
+# Reportes reales de Mercado Libre: traen datos personales de compradores.
+# Las pruebas usan copias anonimizadas en backend/pruebas/fixtures/.
+/*.xlsx
+*:Zone.Identifier
+~$*
+.gstack/
+
+# Reportes de QA locales
+.gstack/
