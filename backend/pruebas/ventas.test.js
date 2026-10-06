@@ -42,6 +42,15 @@ describe('lectura del reporte', () => {
         assert.equal(ce.items[0].cantidad, 2);
         assert.equal(ce.items[0].precioIva, 52300);
         assert.ok(ventas.every((x) => !x.bloqueos.length));
+        assert.ok(ventas.every((x) => x.logistica === 'colecta'));
+    });
+
+    test('Full o Colecta según la forma de entrega', async () => {
+        assert.equal(excelMl.logistica('Mercado Envíos Full'), 'full');
+        assert.equal(excelMl.logistica('Colecta de Mercado Envíos'), 'colecta');
+        assert.equal(excelMl.logistica('Acordar con el vendedor'), '');
+        const ventas = await excelMl.leer(R1001);
+        assert.ok(ventas.every((x) => x.logistica === 'full'));
     });
 
     test('el paquete de 2 productos se agrupa en una sola venta', async () => {
@@ -51,6 +60,7 @@ describe('lectura del reporte', () => {
         assert.deepEqual(paq.items.map((i) => i.sku), ['LM20561', 'LM23224']);
         assert.equal(paq.comprador.documento, '1000190056');
         assert.equal(paq.estado, 'En camino');
+        assert.equal(paq.logistica, 'full');
         assert.deepEqual(paq.bloqueos, []);
         assert.deepEqual(paq.alertas, []);
         assert.ok(!ventas.some((v) => v.numero === '2000018718162770'));
@@ -69,7 +79,7 @@ describe('lectura del reporte', () => {
 describe('documentos', () => {
     test('pedido 0430/0431 de una venta con flete', async () => {
         const v = (await excelMl.leer(R0928))[0];
-        const lineas = documentos.pedidoLineas(v, cfgBase());
+        const lineas = documentos.pedidoLineas(v, cfgBase(), { LM21119: '7072' });
         assert.deepEqual(lineas.map((l) => l.slice(7, 11)), ['0000', '0430', '0431', '0431', '9999']);
         assert.deepEqual(documentos.verificarLargos(lineas), []);
         const enc = lineas[1];
@@ -77,13 +87,34 @@ describe('documentos', () => {
         assert.equal(campo(L.L430, enc, 'f430_num_docto_referencia'), '000018670875084');
         assert.equal(campo(L.L430, enc, 'f430_id_tercero_vendedor').trim(), 'VEN0600');
         assert.equal(campo(L.L430, enc, 'f430_id_fecha'), '20260927');
-        assert.ok(enc.includes('Venta Mercado Libre #2000018670875084'));
+        assert.equal(campo(L.L430, enc, 'f430_id_tipo_docto'), 'PML');
+        assert.equal(campo(L.L430, enc, 'f430_id_punto_envio').trim(), '000');
+        assert.equal(campo(L.L430, enc, 'f430_id_cond_pago').trim(), 'C08');
+        assert.equal(campo(L.L430, enc, 'f430_notas').trim(), 'ML - 2000018670875084 - Colecta de Mercado Envios');
+        assert.equal(campo(L.L431, lineas[2], 'f431_id_tipo_docto'), 'PML');
+        assert.equal(campo(L.L431, lineas[2], 'f431_id_bodega').trim(), 'BP150');
+        assert.equal(campo(L.L431, lineas[2], 'f431_id_lista_precio').trim(), 'L04');
+        assert.equal(campo(L.L431, lineas[2], 'f431_id_ccosto_movto').trim(), '7072');
+        assert.equal(campo(L.L431, lineas[3], 'f431_id_ccosto_movto').trim(), '5059');
         assert.equal(campo(L.L431, lineas[2], 'f431_referencia_item').trim(), 'LM21119');
         assert.equal(campo(L.L431, lineas[2], 'f431_precio_unitario'), '000000000024034.0000');
         assert.equal(campo(L.L431, lineas[2], 'f431_ind_backorder'), '5');
         assert.equal(campo(L.L431, lineas[3], 'f431_referencia_item').trim(), 'FLETE');
         assert.equal(campo(L.L431, lineas[3], 'f431_precio_unitario'), '000000000013026.0000');
         assert.equal(Number(lineas.at(-1).slice(0, 7)), lineas.length);
+    });
+
+    test('las ventas Full salen de la bodega de Mercado Libre', async () => {
+        const v = (await excelMl.leer(R1001))[0];
+        const lineas = documentos.pedidoLineas(v, cfgBase());
+        assert.equal(campo(L.L431, lineas[2], 'f431_id_bodega').trim(), 'BC207');
+        assert.equal(campo(L.L430, lineas[1], 'f430_notas').trim(), `ML - ${v.numero} - Mercado Envios Full`);
+    });
+
+    test('un cargue sin Full / Colecta no se envía', async () => {
+        const v = (await excelMl.leer(R0928))[0];
+        delete v.logistica;
+        assert.equal(proceso.vistaPrevia(v, cfgBase()).estado, 'bloqueada');
     });
 
     test('tercero 0200/0201/0046/0047', async () => {
@@ -127,7 +158,7 @@ describe('documentos', () => {
 });
 
 // ── Envío con SIESA y repositorio simulados ───────────────────────
-function entorno({ tercero = 'activo', pedido = '0', terceroImport = '0' } = {}) {
+function entorno({ tercero = 'activo', pedido = '0', terceroImport = '0', item = 'ok' } = {}) {
     const filas = {};
     const llamadas = [];
     const repo = {
@@ -140,10 +171,14 @@ function entorno({ tercero = 'activo', pedido = '0', terceroImport = '0' } = {})
         },
         async finalizar(venta, r) { Object.assign(filas[venta], r); },
     };
-    const simulado = { tercero, pedido, terceroImport };
+    const simulado = { tercero, pedido, terceroImport, item };
     const soap = {
         ErrorSiesa: soapReal.ErrorSiesa,
         documento: soapReal.documento,
+        async consultarItem(sku) {
+            llamadas.push(['item', sku]);
+            return { estado: simulado.item, mensaje: simulado.item, ccosto: simulado.item === 'ok' ? '7072' : '' };
+        },
         async consultarTercero(doc) { llamadas.push(['consulta', doc]); return { estado: simulado.tercero, mensaje: '', tercero: null }; },
         async importar(lineas) {
             const tipo = lineas[1].slice(7, 11);
@@ -166,19 +201,20 @@ describe('envío', async () => {
     test('tercero activo: importa el pedido y no lo reenvía', async () => {
         const e = entorno();
         assert.equal((await proceso.enviar(venta, e.cfg, ctx, e.deps)).estado, 'enviada');
-        assert.deepEqual(e.llamadas, [['consulta', '1000007919'], ['importar', '0430']]);
+        assert.deepEqual(e.llamadas, [['item', 'LM21119'], ['consulta', '1000007919'], ['importar', '0430']]);
         const fila = e.filas[venta.numero];
         assert.equal(fila.estado, 'importado');
         assert.ok(fila.documentoPedido.includes('<Clave>********</Clave>'));
+        assert.ok(fila.documentoPedido.includes('7072'));
         const r2 = await proceso.enviar(venta, e.cfg, ctx, e.deps);
         assert.equal(r2.estado, 'enviada');
-        assert.equal(e.llamadas.length, 2);
+        assert.equal(e.llamadas.length, 3);
     });
 
     test('crea el tercero si no existe', async () => {
         const e = entorno({ tercero: 'no_existe' });
         assert.equal((await proceso.enviar(venta, e.cfg, ctx, e.deps)).estado, 'enviada');
-        assert.deepEqual(e.llamadas.map((l) => l[1]), ['1000007919', '0200', '0430']);
+        assert.deepEqual(e.llamadas.map((l) => l[1]), ['LM21119', '1000007919', '0200', '0430']);
         assert.equal(e.filas[venta.numero].terceroCreado, true);
     });
 
@@ -186,7 +222,7 @@ describe('envío', async () => {
         const e = entorno({ tercero: 'no_existe' });
         e.cfg.envio.crear_tercero = false;
         assert.equal((await proceso.enviar(venta, e.cfg, ctx, e.deps)).estado, 'con_error');
-        assert.equal(e.llamadas.length, 1);
+        assert.ok(!e.llamadas.some((l) => l[0] === 'importar'));
     });
 
     test('un rechazo permite reintentar', async () => {
@@ -212,6 +248,23 @@ describe('envío', async () => {
         e.simulado.pedido = '0';
         assert.equal((await proceso.enviar(venta, e.cfg, ctx, e.deps)).estado, 'en_proceso');
         assert.equal(e.llamadas.filter((l) => l[0] === 'importar').length, 1);
+    });
+
+    test('SKU que no existe en SIESA: no se envía', async () => {
+        const e = entorno({ item: 'no_existe' });
+        const r = await proceso.enviar(venta, e.cfg, ctx, e.deps);
+        assert.equal(r.estado, 'con_error');
+        assert.ok(!e.llamadas.some((l) => l[0] === 'importar'));
+    });
+
+    test('sin consulta de ítems: usa el centro de costo de respaldo solo si hay uno', async () => {
+        const e = entorno({ item: 'desconocido' });
+        assert.equal((await proceso.enviar(venta, e.cfg, ctx, e.deps)).estado, 'con_error');
+        assert.ok(!e.llamadas.some((l) => l[0] === 'importar'));
+        const e2 = entorno({ item: 'desconocido' });
+        e2.cfg.pedido.ccosto = '5051';
+        assert.equal((await proceso.enviar(venta, e2.cfg, ctx, e2.deps)).estado, 'enviada');
+        assert.ok(e2.filas[venta.numero].documentoPedido.includes('5051'));
     });
 
     test('tercero inactivo bloquea el pedido', async () => {

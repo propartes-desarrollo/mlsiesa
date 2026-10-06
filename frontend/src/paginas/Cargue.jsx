@@ -34,6 +34,8 @@ function Resumen({ ventas }) {
     );
 }
 
+const LOGISTICA = { full: 'Full', colecta: 'Colecta' };
+
 function Detalle({ v, alVerDocumento }) {
     const t = v.tercero;
     return (
@@ -53,10 +55,13 @@ function Detalle({ v, alVerDocumento }) {
                     <Table.Tr key={i}>
                         <Table.Td ff="monospace">{l.referencia}</Table.Td><Table.Td>{l.descripcion}</Table.Td>
                         <Table.Td ta="right">{l.cantidad}</Table.Td><Table.Td ta="right">{pesos(l.precioIva)}</Table.Td>
-                        <Table.Td ta="right">{pesos(l.precioNeto)}</Table.Td><Table.Td ff="monospace">{l.ccosto}</Table.Td>
+                        <Table.Td ta="right">{pesos(l.precioNeto)}</Table.Td><Table.Td ff="monospace">{l.esFlete ? l.ccosto : <Text span size="sm" c="dimmed">del ítem en SIESA</Text>}</Table.Td>
                     </Table.Tr>))}
                 </Table.Tbody>
             </Table>
+            <Text size="xs" c="dimmed">
+                Notas del pedido: <b>{v.notas}</b> · Bodega {v.bodega || '-'}
+            </Text>
             <Text size="xs" c="dimmed">
                 Cobrado en ML {pesos(v.totalMl)} · neto enviado {pesos(v.totalNeto)} · SIESA liquidará aprox. {pesos(v.totalSiesaAprox)} con IVA
             </Text>
@@ -220,6 +225,7 @@ export default function Cargue() {
                                             <Table.Td fz="sm">
                                                 {v.lineas.filter((l) => !l.esFlete).map((l) => `${l.referencia} x${l.cantidad}`).join(', ')}
                                                 {v.lineas.some((l) => l.esFlete) && <Badge ml={6} size="xs" variant="light" color="gray">+ flete</Badge>}
+                                                {v.logistica && <Badge ml={6} size="xs" variant="light" color={v.logistica === 'full' ? 'violet' : 'blue'}>{LOGISTICA[v.logistica]} · {v.bodega}</Badge>}
                                             </Table.Td>
                                             <Table.Td ta="right" fz="sm" style={{ whiteSpace: 'nowrap' }}>{pesos(v.totalMl)}</Table.Td>
                                             <Table.Td>

@@ -20,8 +20,8 @@ El orden de implementación está en [`docs/orden_implementacion.md`](docs/orden
    envía, cómo queda el tercero (nombres y apellidos separados, código DANE de la ciudad), sus
    avisos y bloqueos, y el XML exacto que se enviaría (con la clave oculta).
 3. **Enviar**: se seleccionan las ventas y se envían una por una:
-   consulta del tercero, luego creación si no existe y está habilitada (0200/0201/0046/0047),
-   y por último el pedido (0430/0431).
+   consulta del centro de costo de cada ítem, consulta del tercero, luego creación si no
+   existe y está habilitada (0200/0201/0046/0047), y por último el pedido (0430/0431).
 4. **Historial**: cada envío queda con su estado, el documento enviado y la respuesta de SIESA.
 
 ### Cómo se mapea una venta de ML
@@ -33,7 +33,9 @@ El orden de implementación está en [`docs/orden_implementacion.md`](docs/orden
 | Cantidad / precio | Unidades / "Ingresos por productos" ÷ unidades, **pasado a neto** (÷ 1,19) y subido a peso entero |
 | Línea `FLETE` | "Ingresos por envío" (solo si el comprador pagó envío), en neto |
 | `f430_num_docto_referencia` | Los 15 últimos dígitos del # de venta (tiene 16) |
-| `f430_notas` | `Venta Mercado Libre #<número completo> \| comprador \| ciudad \| Guía` |
+| `f430_notas` | `ML - <# de venta completo> - Mercado Envíos Full` o `- Colecta de Mercado Envíos` |
+| Bodega (`f431_id_bodega`) | "Forma de entrega": **Full** → `BC207` (bodega de ML con productos nuestros), **Colecta** → `BP150` (nuestra bodega, donde recoge el carro de ML). Otra forma de entrega bloquea la venta |
+| Centro de costo (`f431_id_ccosto_movto`) | El **del ítem en SIESA**, consultado al enviar (`CONSULTA_ITEM_ML`). El flete usa `pedido.ccosto_flete` |
 | Vendedor | Tercero MERCADO LIBRE `VEN0600` (en el cliente nuevo: vendedor y cobrador `0600`) |
 
 ### Reglas de seguridad del envío
@@ -109,23 +111,22 @@ Manager el Proxy Host del dominio apuntando a `mlsiesa_frontend:80`. La IP del s
 estar en la lista blanca del web service de SIESA. Los cambios de esquema van como migraciones
 aditivas en `db/migraciones/`.
 
+## Parámetros de Mercado Libre
+
+Confirmados por el equipo (2026-10-06): centro de operación `021`, tipo de documento `PML`,
+lista de precios `L04`, condición de pago `C08`, tipo de cliente `6000` (Clientes Ventas
+Virtuales, el mismo de B2C), bodegas `BC207` (Full) y `BP150` (Colecta).
+El punto de envío va en `000`: es el único que acepta SIESA (con `T01` rechaza el pedido;
+hallazgo de `propartes-siesa-sync`).
+
 ## Pendientes antes de enviar pedidos reales
 
 Hay que cerrarlos con TI y contabilidad. Ninguno bloquea la revisión de las ventas.
 
-1. **El pedido de la tienda B2C todavía es rechazado por SIESA** (`printTipoError=1`) con
-   estos mismos layouts. El ejemplo de TI sí importa, así que falta revisar el `0430` campo
-   por campo (ver `propartes-siesa-sync/docs/conectores/CAMPOS-QUE-RECHAZA-SIESA.md`).
-   Esta app hereda ese diagnóstico.
-2. **Parámetros de Mercado Libre**: confirmar los marcados "confirmar con TI" en Parámetros
-   SIESA (CO, tipo de documento, lista de precios, condición de pago, bodega, punto de envío,
-   centro de costo, tipo de cliente).
-3. **`CONSULTA_TERCERO_ECOMMERCE`**: TI debe registrarla. Sin ella todo tercero sale como
-   "desconocido" y se envía el pedido sin crear el tercero.
-4. **Creación de terceros** (`envio.crear_tercero`): nunca probada contra SIESA. Faltan los
+1. **Creación de terceros** (`envio.crear_tercero`): nunca probada contra SIESA. Faltan los
    registros de facturación electrónica (0753) y definir el **email** del tercero, porque ML
    no lo entrega (`tercero.email_respaldo`).
-5. **Precios con IVA**: se asume IVA 19 % para todo producto. Un ítem exento quedaría con el
+2. **Precios con IVA**: se asume IVA 19 % para todo producto. Un ítem exento quedaría con el
    neto mal calculado.
-6. **Códigos de ciudad**: confirmar que el maestro de SIESA usa DIVIPOLA/DANE.
-7. **Conexión de producción**: hoy `SIESA_CONEXION=Pruebas`.
+3. **Códigos de ciudad**: confirmar que el maestro de SIESA usa DIVIPOLA/DANE.
+4. **Conexión de producción**: hoy `SIESA_CONEXION=Pruebas`.

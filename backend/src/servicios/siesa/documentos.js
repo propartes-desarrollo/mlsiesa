@@ -11,6 +11,9 @@
 //  - El # de venta de ML tiene 16 dígitos y f430_num_docto_referencia admite 15:
 //    van los 15 últimos, y el número completo en las notas.
 //  - El vendedor del pedido es el tercero MERCADO LIBRE (pedido.vendedor).
+//  - La bodega depende de la logística: Full (bodega de ML) o Colecta (BP150).
+//  - El centro de costo de cada línea es el del ítem en SIESA (ccostos, por SKU),
+//    que se consulta al enviar. Con uno que no es del ítem, SIESA rechaza el pedido.
 // ================================================================
 const P = require('./plano');
 const L = require('./layouts');
@@ -25,33 +28,40 @@ const referenciaMl = (numero) => String(numero).slice(-15);
 const aaaammdd = (f) => `${f.getFullYear()}${String(f.getMonth() + 1).padStart(2, '0')}${String(f.getDate()).padStart(2, '0')}`;
 const fechaVenta = (venta) => (venta.fecha ? new Date(venta.fecha) : new Date());
 
+const LOGISTICA = { full: 'Full', colecta: 'Colecta' };
+// Texto de la forma de entrega en las notas, tal como lo nombra Mercado Libre.
+const FORMA_ENTREGA = { full: 'Mercado Envíos Full', colecta: 'Colecta de Mercado Envíos' };
+
+function bodega(venta, cfg) {
+    if (venta.logistica === 'full') return cfg.pedido.bodega_full;
+    if (venta.logistica === 'colecta') return cfg.pedido.bodega_colecta;
+    return '';
+}
+
 // Las líneas del 0431, ya en neto. Sirve también para la vista previa.
-function lineasDetalle(venta, cfg) {
+// ccostos: { sku: centro de costo } consultado en SIESA; sin él va el de respaldo.
+function lineasDetalle(venta, cfg, ccostos = {}) {
     const p = cfg.pedido;
     const out = venta.items.map((it) => ({
         referencia: it.sku, descripcion: it.titulo, cantidad: it.cantidad,
-        precioIva: it.precioIva, precioNeto: neto(it.precioIva, p.iva_pct), ccosto: p.ccosto, esFlete: false,
+        precioIva: it.precioIva, precioNeto: neto(it.precioIva, p.iva_pct),
+        ccosto: ccostos[it.sku] || p.ccosto, ccostoDeSiesa: Boolean(ccostos[it.sku]), esFlete: false,
     }));
     if (venta.fleteIva > 0 && p.ref_flete) {
         out.push({
             referencia: p.ref_flete, descripcion: 'Envío pagado por el comprador', cantidad: 1,
-            precioIva: venta.fleteIva, precioNeto: neto(venta.fleteIva, p.iva_flete_pct), ccosto: p.ccosto_flete, esFlete: true,
+            precioIva: venta.fleteIva, precioNeto: neto(venta.fleteIva, p.iva_flete_pct), ccosto: p.ccosto_flete, ccostoDeSiesa: false, esFlete: true,
         });
     }
     return out;
 }
 
+// Lo pide el equipo en todos los pedidos: "ML - <# de venta> - <forma de entrega>".
 function notas(venta) {
-    const c = venta.comprador;
-    return [
-        `Venta Mercado Libre #${venta.numero}`,
-        c.nombre,
-        c.ciudadEnvio ? `${c.ciudadEnvio}, ${c.deptoEnvio}` : '',
-        venta.seguimiento ? `Guia ${venta.seguimiento}` : '',
-    ].filter(Boolean).join(' | ');
+    return [`ML - ${venta.numero}`, FORMA_ENTREGA[venta.logistica]].filter(Boolean).join(' - ');
 }
 
-function pedidoLineas(venta, cfg) {
+function pedidoLineas(venta, cfg, ccostos = {}) {
     const p = cfg.pedido;
     const cia = cfg.siesa.cia;
     const fecha = fechaVenta(venta);
@@ -88,14 +98,15 @@ function pedidoLineas(venta, cfg) {
     }));
 
     const impuestos = [];
-    lineasDetalle(venta, cfg).forEach((ln, idx) => {
+    const idBodega = bodega(venta, cfg);
+    lineasDetalle(venta, cfg, ccostos).forEach((ln, idx) => {
         const nro = idx + 1;
         lineas.push(P.registro(L.L431, {
             'F_NUMERO-REG': consec++, 'F_TIPO-REG': 431, 'F_SUBTIPO-REG': 0,
             'F_VERSION-REG': p.version, F_CIA: cia,
             f431_id_co: p.co, f431_id_tipo_docto: p.tipo_docto, f431_consec_docto: 0,
             f431_nro_registro: nro, f431_referencia_item: ln.referencia,
-            f431_id_bodega: p.bodega, f431_id_concepto: p.concepto, f431_id_motivo: p.motivo,
+            f431_id_bodega: idBodega, f431_id_concepto: p.concepto, f431_id_motivo: p.motivo,
             f431_id_co_movto: p.co_movto, f431_id_ccosto_movto: ln.ccosto,
             f431_fecha_entrega: fDocto, f431_num_dias_entrega: dias,
             f431_id_lista_precio: p.lista_precio, f431_id_unidad_medida: p.unidad,
@@ -248,5 +259,5 @@ function verificarLargos(lineas) {
 
 module.exports = {
     pedidoLineas, terceroLineas, lineasDetalle, datosTercero, verificarLargos,
-    neto, referenciaMl, digitoVerificacion, partirNombre, notas,
+    neto, referenciaMl, digitoVerificacion, partirNombre, notas, bodega, LOGISTICA,
 };

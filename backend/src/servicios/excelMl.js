@@ -46,11 +46,23 @@ const COLUMNAS = {
     codPostal: ['Código postal', 1],
     transportista: ['Transportista', 1],
     seguimiento: ['Número de seguimiento', 1],
+    formaEntrega: ['Forma de entrega', 1],
 };
 const OBLIGATORIAS = ['venta', 'fecha', 'estado', 'unidades', 'ingresosProductos', 'sku',
     'precioUnitario', 'factNombre', 'factDocumento'];
 
 const TIPOS_DOC = { CC: 'C', CE: 'E', NIT: 'N', PP: 'P', PAS: 'P', PASAPORTE: 'P' };
+
+// Logística de la venta, según "Forma de entrega" (viene en la fila del paquete, no en
+// las hijas):
+//   full    "Mercado Envíos Full": sale de la bodega que ML tiene con productos nuestros.
+//   colecta "Colecta de Mercado Envíos": el carro de ML recoge en nuestra bodega principal.
+function logistica(formaEntrega) {
+    const f = sinTildes(formaEntrega).toLowerCase();
+    if (/\bfull\b/.test(f)) return 'full';
+    if (f.includes('colecta')) return 'colecta';
+    return '';
+}
 
 const sinTildes = (s) => String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '');
 
@@ -243,6 +255,12 @@ function construirVenta(fila, nroFila, estado, hijas, g) {
     const fecha = parseFecha(g(fila, 'fecha'));
     if (!fecha) bloqueos.push(`Fecha de venta no reconocida: "${txt(g(fila, 'fecha'))}".`);
 
+    const formaEntrega = txt(g(fila, 'formaEntrega'));
+    const tipoLogistica = logistica(formaEntrega);
+    if (!tipoLogistica) {
+        bloqueos.push(`Forma de entrega "${formaEntrega || 'vacía'}": no es Full ni Colecta, no se sabe de qué bodega sale.`);
+    }
+
     return {
         numero: txt(g(fila, 'venta')),
         fila: nroFila,
@@ -267,6 +285,8 @@ function construirVenta(fila, nroFila, estado, hijas, g) {
             codPostal: txt(g(fila, 'codPostal')),
         },
         seguimiento: txt(g(fila, 'seguimiento')),
+        formaEntrega,
+        logistica: tipoLogistica,
         transportista: txt(g(fila, 'transportista')),
         alertas,
         bloqueos,
@@ -275,4 +295,4 @@ function construirVenta(fila, nroFila, estado, hijas, g) {
 
 const totalIva = (v) => v.items.reduce((s, it) => s + it.cantidad * it.precioIva, 0) + v.fleteIva;
 
-module.exports = { leer, parseFecha, parseDocumento, ciudadDeptoDeDireccion, sinTildes, totalIva };
+module.exports = { leer, parseFecha, parseDocumento, ciudadDeptoDeDireccion, sinTildes, totalIva, logistica };

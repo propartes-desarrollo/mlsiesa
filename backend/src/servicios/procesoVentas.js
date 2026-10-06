@@ -18,6 +18,12 @@ function vistaPrevia(venta, cfg, previo = null, municipios = {}) {
         alertas.push(`Ciudad "${c.ciudadFact || c.ciudadEnvio}, ${c.deptoFact || c.deptoEnvio}" sin código SIESA: el tercero se crearía sin ciudad.`);
     }
     if (c.juridica) alertas.push('Comprador empresa: revisar razón social y retenciones antes de crear el tercero.');
+    const idBodega = documentos.bodega(venta, cfg);
+    if (venta.logistica === undefined) {
+        bloqueos.push('Este cargue es anterior a la separación Full / Colecta: vuelva a subir el reporte.');
+    } else if (venta.logistica && !idBodega) {
+        bloqueos.push(`No hay bodega configurada para las ventas ${documentos.LOGISTICA[venta.logistica]}.`);
+    }
 
     if (!bloqueos.length) bloqueos.push(...documentos.verificarLargos(documentos.pedidoLineas(venta, cfg)));
 
@@ -41,11 +47,34 @@ function vistaPrevia(venta, cfg, previo = null, municipios = {}) {
             ciudad: c.ciudadEnvio, depto: c.deptoEnvio, direccionEnvio: c.direccionEnvio,
         },
         tercero,
+        logistica: venta.logistica || '',
+        bodega: idBodega,
+        notas: documentos.notas(venta),
         lineas: detalle,
         totalMl, totalNeto, totalSiesaAprox: totalSiesa,
         seguimiento: venta.seguimiento,
         alertas, bloqueos,
     };
+}
+
+// Centro de costo de cada SKU según SIESA. Devuelve { ccostos, error }: error cuando
+// algún ítem no existe, o cuando no se pudo saber su centro de costo y no hay respaldo.
+async function resolverCcostos(venta, cfg, soap, pasos) {
+    const ccostos = {};
+    for (const sku of [...new Set(venta.items.map((it) => it.sku))]) {
+        const r = await soap.consultarItem(sku, cfg.siesa);
+        if (r.estado === 'ok') {
+            ccostos[sku] = r.ccosto;
+            pasos.push(`Ítem ${sku}: centro de costo ${r.ccosto}`);
+        } else if (r.estado === 'no_existe') {
+            return { ccostos, error: `${r.mensaje} Revisar el SKU de la publicación en Mercado Libre.` };
+        } else if (cfg.pedido.ccosto) {
+            pasos.push(`Ítem ${sku}: ${r.mensaje} Se usa el centro de costo de respaldo ${cfg.pedido.ccosto}.`);
+        } else {
+            return { ccostos, error: `${r.mensaje} Sin centro de costo SIESA rechaza el pedido.` };
+        }
+    }
+    return { ccostos, error: '' };
 }
 
 // Envía una venta. Nunca lanza por errores de SIESA: devuelve { estado, mensaje, pasos }.
@@ -61,7 +90,7 @@ async function enviar(venta, cfg, ctx, { repo, soap }, municipios = {}) {
     }
 
     const pasos = [];
-    const lineasPedido = documentos.pedidoLineas(venta, cfg);
+    let lineasPedido = documentos.pedidoLineas(venta, cfg);
     const registro = {
         documentoPedido: soap.documento(lineasPedido, cfg.siesa, true),
         documentoTercero: '',
@@ -77,6 +106,11 @@ async function enviar(venta, cfg, ctx, { repo, soap }, municipios = {}) {
     };
 
     try {
+        const { ccostos, error } = await resolverCcostos(venta, cfg, soap, pasos);
+        if (error) return terminar('error', error);
+        lineasPedido = documentos.pedidoLineas(venta, cfg, ccostos);
+        registro.documentoPedido = soap.documento(lineasPedido, cfg.siesa, true);
+
         if (cfg.envio.validar_tercero) {
             const t = await soap.consultarTercero(venta.comprador.documento, cfg.siesa);
             pasos.push(`Tercero ${venta.comprador.documento}: ${t.estado}${t.mensaje ? ` (${t.mensaje})` : ''}`);

@@ -3,6 +3,7 @@
 //
 //   importar(lineas)          -> ImportarXML. ESCRIBE en el ERP: no hay modo de validación.
 //   consultarTercero(doc)     -> EjecutarConsultaXML con CONSULTA_TERCERO_ECOMMERCE.
+//   consultarItem(sku)        -> EjecutarConsultaXML con CONSULTA_ITEM_ML (centro de costo).
 //
 // El resultado de ImportarXML viene en <printTipoError>, con HTTP 200 aun cuando
 // rechaza: 0 = importado, 1 = rechazado por contenido, 3 = usuario no habilitado.
@@ -121,4 +122,20 @@ async function consultarTercero(documentoTercero, siesa) {
     return { estado: 'no_existe', mensaje: 'El tercero existe pero no es cliente (sin sucursal 001).', tercero: t };
 }
 
-module.exports = { importar, consultar, consultarTercero, documento, filas, ErrorSiesa, CODIGOS };
+// Centro de costo de venta del ítem. SIESA rechaza el pedido si la línea lleva uno que no
+// es el del ítem. estado: ok | no_existe | sin_ccosto | desconocido
+async function consultarItem(referencia, siesa) {
+    let resultado;
+    try {
+        resultado = await consultar(siesa.consultaItems, { referencia }, siesa);
+    } catch (e) {
+        if (!(e instanceof ErrorSiesa)) throw e;
+        return { estado: 'desconocido', mensaje: e.message, ccosto: '' };
+    }
+    if (!resultado.length) return { estado: 'no_existe', mensaje: `El SKU ${referencia} no existe como ítem en SIESA.`, ccosto: '' };
+    const ccosto = String(resultado[0].ccosto_venta || '').trim();
+    if (!ccosto) return { estado: 'sin_ccosto', mensaje: `El ítem ${referencia} no tiene centro de costo de venta en SIESA.`, ccosto: '' };
+    return { estado: 'ok', mensaje: '', ccosto };
+}
+
+module.exports = { importar, consultar, consultarTercero, consultarItem, documento, filas, ErrorSiesa, CODIGOS };

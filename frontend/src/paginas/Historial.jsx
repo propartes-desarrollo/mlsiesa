@@ -103,7 +103,7 @@ export default function Historial() {
                         {detalle.estado === 'enviando' && (
                             <Alert color="grape" icon={<AlertTriangle size={18} />}>
                                 <Text size="sm">No se sabe si SIESA registró este pedido (no respondió o el envío se interrumpió). Busque en SIESA el pedido con referencia
-                                    <b> {detalle.venta.slice(-15)}</b> o la nota "Venta Mercado Libre #{detalle.venta}".</Text>
+                                    <b> {detalle.venta.slice(-15)}</b> o la nota "ML - {detalle.venta}".</Text>
                                 {esAdmin && <Button mt="sm" size="xs" color="grape" onClick={() => liberar(detalle.venta)}>Verifiqué que NO está en SIESA: liberar para reenviar</Button>}
                             </Alert>
                         )}
