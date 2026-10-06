@@ -104,6 +104,23 @@ const L046 = [
 ];
 
 // 0046 (impuesto) y 0047 (retención) comparten layout.
-const LARGOS = { '0430': 2556, '0431': 2562, '0432': 113, '0200': 905, '0201': 1095, '0207': 50, '0046': 46, '0047': 46, '0000': 18, '9999': 18 };
+// 0753 - Entidades dinámicas (facturación electrónica). Mismo cuerpo para el tercero
+// (subtipo 07, entidad M200) y para el cliente (subtipo 08, entidad M201); solo cambia la
+// llave del inicio. Plantillas 005 y 006 de TI (siesa_terceros_clientes).
+const CUERPO_753 = [
+    ['f753_id_grupo_entidad', 30, 'A'], ['f753_id_entidad', 30, 'A'], ['f753_id_atributo', 30, 'A'],
+    ['f753_dato_numerico', 28, 'A'],   // 17 enteros + punto + 10 decimales: va como texto fijo
+    ['f753_dato_texto', 2000, 'A'], ['f753_dato_fecha_hora', 8, 'A'], ['f753_id_maestro', 10, 'A'],
+    ['f753_id_maestro_detalle', 20, 'A'], ['f753_id_tipo_entidad', 8, 'A'], ['f753_nro_fila', 4, 'N'],
+    ['f753_id_maestro_interno', 10, 'A'], ['f753_id_maestro_interno_detalle', 100, 'A'],
+];
+const INICIO_753 = [
+    ['F_NUMERO_REG', 7, 'N'], ['F_TIPO_REG', 4, 'N'], ['F_SUBTIPO_REG', 2, 'N'],
+    ['F_VERSION_REG', 2, 'N'], ['F_CIA', 3, 'N'], ['F_ACTUALIZA_REG', 1, 'N'],
+];
+const L753T = [...INICIO_753, ['f200_id', 15, 'A'], ['RESERVADO', 185, 'A'], ...CUERPO_753];
+const L753C = [...INICIO_753, ['f201_id_tercero', 15, 'A'], ['f201_id_sucursal', 3, 'A'], ['RESERVADO', 182, 'A'], ...CUERPO_753];
 
-module.exports = { L430, L431, L432, L200, L201, L207, L046, LARGOS };
+const LARGOS = { '0430': 2556, '0431': 2562, '0432': 113, '0200': 905, '0201': 1095, '0207': 50, '0046': 46, '0047': 46, '0753': 2497, '0000': 18, '9999': 18 };
+
+module.exports = { L430, L431, L432, L200, L201, L207, L046, L753T, L753C, LARGOS };

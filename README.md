@@ -22,7 +22,13 @@ El orden de implementación está en [`docs/orden_implementacion.md`](docs/orden
 3. **Enviar**: se seleccionan las ventas y se envían una por una:
    consulta del centro de costo de cada ítem, consulta del tercero, luego creación si no
    existe y está habilitada (0200/0201/0046/0047), y por último el pedido (0430/0431).
-4. **Historial**: cada envío queda con su estado, el documento enviado y la respuesta de SIESA.
+4. **Historial**: cada envío queda con su estado, el **número del pedido en SIESA** (`PML-…`)
+   con sus líneas, bodega, IVA y total tal como quedaron en el ERP, el documento enviado y la
+   respuesta de SIESA. "Consultar en SIESA" vuelve a leer el pedido.
+
+`ImportarXML` no devuelve el número del pedido creado: después de importar, la app lo busca
+con `CONSULTA_PEDIDO_ML` por el documento de referencia. La misma consulta se hace **antes**
+de enviar: si la venta ya está en SIESA, no se reenvía.
 
 ### Cómo se mapea una venta de ML
 
@@ -119,13 +125,28 @@ Virtuales, el mismo de B2C), bodegas `BC207` (Full) y `BP150` (Colecta).
 El punto de envío va en `000`: es el único que acepta SIESA (con `T01` rechaza el pedido;
 hallazgo de `propartes-siesa-sync`).
 
+## Creación de terceros
+
+Si el comprador no existe en SIESA, la app lo crea en un solo documento, antes del pedido:
+
+| Registro | Qué crea |
+|---|---|
+| `0200` | El tercero (nombres y apellidos separados, ciudad DANE) |
+| `0201` | El cliente, sucursal `001`: vendedor/cobrador `0600`, `C08`, tipo `6000`, lista `L04`, calificación `A` (obligatoria) |
+| `0753` x4 | Facturación electrónica 2.1 (persona natural): régimen `49`, obligación `R-99-PN`, detalle tributario 1 `01`, detalle tributario 2 `ZZ` |
+| `0753` x1 | Correo FE del cliente: `tienda.virtual@propartes.com` (ML no entrega el correo del comprador) |
+| `0046` / `0047` | Impuestos (IVA) y retenciones (ninguna) |
+
+Probado en Pruebas el 2026-10-06 con terceros ficticios (`999000001` a `999000003`,
+"Prueba Mlsiesa Tercero Ficticio"): importa y queda como cliente activo.
+
 ## Pendientes antes de enviar pedidos reales
 
 Hay que cerrarlos con TI y contabilidad. Ninguno bloquea la revisión de las ventas.
 
-1. **Creación de terceros** (`envio.crear_tercero`): nunca probada contra SIESA. Faltan los
-   registros de facturación electrónica (0753) y definir el **email** del tercero, porque ML
-   no lo entrega (`tercero.email_respaldo`).
+1. **Terceros empresa**: la creación de terceros (`envio.crear_tercero`) está probada en
+   Pruebas para **persona natural**, con facturación electrónica y correo. Para
+   empresas faltan sus códigos FE y las retenciones (ver "Creación de terceros").
 2. **Precios con IVA**: se asume IVA 19 % para todo producto. Un ítem exento quedaría con el
    neto mal calculado.
 3. **Códigos de ciudad**: confirmar que el maestro de SIESA usa DIVIPOLA/DANE.

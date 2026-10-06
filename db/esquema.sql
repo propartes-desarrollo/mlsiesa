@@ -90,6 +90,8 @@ CREATE TABLE IF NOT EXISTS envios (
   documento_tercero TEXT,
   respuesta         TEXT,          -- respuesta SOAP de SIESA (recortada)
   resumen           JSONB DEFAULT '{}'::jsonb,
+  pedido_siesa      JSONB,         -- el pedido como quedó en SIESA (número y líneas)
+  pedido_consultado_en TIMESTAMPTZ,
   intentos          INTEGER NOT NULL DEFAULT 0,
   cargue_id         UUID REFERENCES cargues(id),
   enviado_por       UUID REFERENCES usuarios(id),

@@ -58,6 +58,7 @@ export const envios = {
     listar: (filtros) => api.get('/envios', { params: filtros }),
     detalle: (venta) => api.get(`/envios/${venta}`),
     liberar: (venta) => api.post(`/envios/${venta}/liberar`, {}),
+    consultarSiesa: (venta) => api.post(`/envios/${venta}/consultar-siesa`, {}, { timeout: 200000 }),
 };
 
 export const parametros = {

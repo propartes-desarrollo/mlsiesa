@@ -125,10 +125,20 @@ describe('documentos', () => {
         assert.deepEqual([d.depto, d.ciudad], ['76', '364']);
         assert.equal(d.direccion, 'Calle 11, 1-21, Simón bolivar');
         const lineas = documentos.terceroLineas(v, cfg);
-        assert.deepEqual(lineas.map((l) => l.slice(7, 11)), ['0000', '0200', '0201', '0046', '0046', '0047', '0047', '0047', '9999']);
+        assert.deepEqual(lineas.map((l) => l.slice(7, 11)),
+            ['0000', '0200', '0201', '0753', '0753', '0753', '0753', '0753', '0046', '0046', '0047', '0047', '0047', '9999']);
+        // Facturación electrónica de persona natural (importa en Pruebas, 2026-10-06).
+        const fe = lineas.filter((l) => l.slice(7, 11) === '0753');
+        assert.deepEqual(fe.map((l) => [campo(L.L753T, l, 'f753_id_atributo').trim(), campo(L.L753T, l, 'f753_id_maestro_detalle').trim()]).slice(0, 4),
+            [['co017_codigo_regimen', '49'], ['co017_cod_tipo_oblig', 'R-99-PN'], ['co031_detalle_tributario1', '01'], ['co031_detalle_tributario2', 'ZZ']]);
+        assert.equal(campo(L.L753C, fe[4], 'f753_id_atributo').trim(), 'co011_correo_fe');
+        assert.equal(campo(L.L753C, fe[4], 'f753_dato_texto').trim(), 'tienda.virtual@propartes.com');
+        assert.equal(campo(L.L753C, fe[4], 'f753_id_tipo_entidad').trim(), 'M201');
         assert.deepEqual(documentos.verificarLargos(lineas), []);
         assert.equal(campo(L.L201, lineas[2], 'F201_ID_VENDEDOR'), '0600');
         assert.equal(campo(L.L201, lineas[2], 'f201_id_cobrador'), '0600');
+        // Obligatorio: vacío, SIESA rechaza el cliente (probado en Pruebas 2026-10-06).
+        assert.equal(campo(L.L201, lineas[2], 'F201_IND_CALIFICACION'), 'A');
         assert.equal(campo(L.L200, lineas[1], 'F200_ID_TIPO_IDENT'), 'C');
     });
 
@@ -150,6 +160,19 @@ describe('documentos', () => {
         assert.deepEqual(dane.resolver('Inventado', 'Antioquia', { '05': { inventado: '999' } }), ['05', '999']);
     });
 
+    test('filas de CONSULTA_PEDIDO_ML agrupadas por pedido', () => {
+        const base = { co: '021', tipo_docto: 'PML', fecha: '2026-09-30', estado: '2', tercero: '1', tercero_nombre: 'X', notas: 'ML - 1' };
+        const pedidos = soapReal.agruparPedidos([
+            { ...base, consec: '7', item: 'LM1', cantidad: '2.0000', precio_unitario: '1000.0000', vlr_bruto: '2000', vlr_imp: '380', vlr_neto: '2380' },
+            { ...base, consec: '7', item: 'LM2', cantidad: '1.0000', precio_unitario: '500.0000', vlr_bruto: '500', vlr_imp: '95', vlr_neto: '595' },
+            { ...base, consec: '9', item: 'LM1', cantidad: '1', vlr_neto: '10' },
+        ]);
+        assert.deepEqual(pedidos.map((p) => p.numero), ['PML-9', 'PML-7']);
+        assert.equal(pedidos[1].lineas.length, 2);
+        assert.equal(pedidos[1].totalNeto, 2975);
+        assert.equal(pedidos[1].estadoTexto, 'Aprobado');
+    });
+
     test('respuesta SOAP de consulta', () => {
         const xml = '<diffgr:diffgram><NewDataSet><Resultado><tercero_id>123</tercero_id><sucursal>001</sucursal>'
             + '<estado_activo>1</estado_activo></Resultado></NewDataSet></diffgr:diffgram>';
@@ -158,7 +181,7 @@ describe('documentos', () => {
 });
 
 // ── Envío con SIESA y repositorio simulados ───────────────────────
-function entorno({ tercero = 'activo', pedido = '0', terceroImport = '0', item = 'ok' } = {}) {
+function entorno({ tercero = 'activo', pedido = '0', terceroImport = '0', item = 'ok', yaEnSiesa = false } = {}) {
     const filas = {};
     const llamadas = [];
     const repo = {
@@ -171,10 +194,17 @@ function entorno({ tercero = 'activo', pedido = '0', terceroImport = '0', item =
         },
         async finalizar(venta, r) { Object.assign(filas[venta], r); },
     };
-    const simulado = { tercero, pedido, terceroImport, item };
+    const simulado = { tercero, pedido, terceroImport, item, enSiesa: yaEnSiesa };
+    const pedidoSiesa = { numero: 'PML-123', consec: '123', lineas: [] };
     const soap = {
         ErrorSiesa: soapReal.ErrorSiesa,
         documento: soapReal.documento,
+        async consultarPedido(ref) {
+            llamadas.push(['pedido', ref]);
+            return simulado.enSiesa
+                ? { estado: 'encontrado', mensaje: '', pedidos: [pedidoSiesa] }
+                : { estado: 'no_existe', mensaje: '', pedidos: [] };
+        },
         async consultarItem(sku) {
             llamadas.push(['item', sku]);
             return { estado: simulado.item, mensaje: simulado.item, ccosto: simulado.item === 'ok' ? '7072' : '' };
@@ -186,6 +216,7 @@ function entorno({ tercero = 'activo', pedido = '0', terceroImport = '0', item =
             const cod = tipo === '0200' ? simulado.terceroImport : simulado.pedido;
             if (cod === 'red') throw new soapReal.ErrorSiesa('sin red');
             if (cod === 'timeout') throw new soapReal.ErrorSiesa('SIESA no respondió', { incierto: true });
+            if (tipo === '0430' && cod === '0') simulado.enSiesa = true;
             return { codigo: cod, exito: cod === '0', mensaje: 'x', respuesta: '' };
         },
     };
@@ -201,20 +232,23 @@ describe('envío', async () => {
     test('tercero activo: importa el pedido y no lo reenvía', async () => {
         const e = entorno();
         assert.equal((await proceso.enviar(venta, e.cfg, ctx, e.deps)).estado, 'enviada');
-        assert.deepEqual(e.llamadas, [['item', 'LM21119'], ['consulta', '1000007919'], ['importar', '0430']]);
+        assert.deepEqual(e.llamadas, [['pedido', '000018670875084'], ['item', 'LM21119'], ['consulta', '1000007919'],
+            ['importar', '0430'], ['pedido', '000018670875084']]);
         const fila = e.filas[venta.numero];
         assert.equal(fila.estado, 'importado');
+        assert.equal(fila.pedidoSiesa.numero, 'PML-123');
+        assert.match(fila.detalle, /PML-123/);
         assert.ok(fila.documentoPedido.includes('<Clave>********</Clave>'));
         assert.ok(fila.documentoPedido.includes('7072'));
         const r2 = await proceso.enviar(venta, e.cfg, ctx, e.deps);
         assert.equal(r2.estado, 'enviada');
-        assert.equal(e.llamadas.length, 3);
+        assert.equal(e.llamadas.length, 5);
     });
 
     test('crea el tercero si no existe', async () => {
         const e = entorno({ tercero: 'no_existe' });
         assert.equal((await proceso.enviar(venta, e.cfg, ctx, e.deps)).estado, 'enviada');
-        assert.deepEqual(e.llamadas.map((l) => l[1]), ['LM21119', '1000007919', '0200', '0430']);
+        assert.deepEqual(e.llamadas.filter((l) => l[0] !== 'pedido').map((l) => l[1]), ['LM21119', '1000007919', '0200', '0430']);
         assert.equal(e.filas[venta.numero].terceroCreado, true);
     });
 
@@ -248,6 +282,15 @@ describe('envío', async () => {
         e.simulado.pedido = '0';
         assert.equal((await proceso.enviar(venta, e.cfg, ctx, e.deps)).estado, 'en_proceso');
         assert.equal(e.llamadas.filter((l) => l[0] === 'importar').length, 1);
+    });
+
+    test('si el pedido ya está en SIESA no se vuelve a importar', async () => {
+        const e = entorno({ yaEnSiesa: true });
+        const r = await proceso.enviar(venta, e.cfg, ctx, e.deps);
+        assert.equal(r.estado, 'enviada');
+        assert.match(r.mensaje, /ya estaba en SIESA como PML-123/);
+        assert.ok(!e.llamadas.some((l) => l[0] === 'importar'));
+        assert.equal(e.filas[venta.numero].pedidoSiesa.numero, 'PML-123');
     });
 
     test('SKU que no existe en SIESA: no se envía', async () => {

@@ -4,6 +4,7 @@
 //   importar(lineas)          -> ImportarXML. ESCRIBE en el ERP: no hay modo de validación.
 //   consultarTercero(doc)     -> EjecutarConsultaXML con CONSULTA_TERCERO_ECOMMERCE.
 //   consultarItem(sku)        -> EjecutarConsultaXML con CONSULTA_ITEM_ML (centro de costo).
+//   consultarPedido(ref)      -> EjecutarConsultaXML con CONSULTA_PEDIDO_ML (número y líneas).
 //
 // El resultado de ImportarXML viene en <printTipoError>, con HTTP 200 aun cuando
 // rechaza: 0 = importado, 1 = rechazado por contenido, 3 = usuario no habilitado.
@@ -138,4 +139,55 @@ async function consultarItem(referencia, siesa) {
     return { estado: 'ok', mensaje: '', ccosto };
 }
 
-module.exports = { importar, consultar, consultarTercero, consultarItem, documento, filas, ErrorSiesa, CODIGOS };
+const ESTADOS_PEDIDO = { 0: 'En elaboración', 1: 'Retenido', 2: 'Aprobado', 3: 'Comprometido', 4: 'Cumplido', 9: 'Anulado' };
+const numero = (v) => (v === undefined || v === '' ? 0 : Number(v));
+
+// Las filas de CONSULTA_PEDIDO_ML (una por línea) agrupadas en pedidos, del más reciente
+// al más antiguo. Normalmente hay uno solo por venta.
+function agruparPedidos(resultado) {
+    const pedidos = new Map();
+    for (const f of resultado) {
+        const clave = `${f.co}-${f.tipo_docto}-${f.consec}`;
+        if (!pedidos.has(clave)) {
+            pedidos.set(clave, {
+                co: f.co, tipoDocto: f.tipo_docto, consec: String(f.consec), numero: `${f.tipo_docto}-${f.consec}`,
+                fecha: f.fecha, estado: String(f.estado), estadoTexto: ESTADOS_PEDIDO[f.estado] || `Estado ${f.estado}`,
+                tercero: f.tercero, terceroNombre: f.tercero_nombre, notas: f.notas, lineas: [],
+            });
+        }
+        if (f.item || f.linea_rowid) {
+            pedidos.get(clave).lineas.push({
+                item: f.item, descripcion: f.descripcion, bodega: f.bodega, cantidad: numero(f.cantidad),
+                precioUnitario: numero(f.precio_unitario), vlrBruto: numero(f.vlr_bruto),
+                vlrImp: numero(f.vlr_imp), vlrNeto: numero(f.vlr_neto),
+            });
+        }
+    }
+    const lista = [...pedidos.values()].sort((a, b) => Number(b.consec) - Number(a.consec));
+    for (const p of lista) {
+        p.totalBruto = p.lineas.reduce((s, l) => s + l.vlrBruto, 0);
+        p.totalImp = p.lineas.reduce((s, l) => s + l.vlrImp, 0);
+        p.totalNeto = p.lineas.reduce((s, l) => s + l.vlrNeto, 0);
+    }
+    return lista;
+}
+
+// El pedido que quedó en SIESA para una venta, por su documento de referencia.
+// estado: encontrado | no_existe | desconocido. Si hay más de uno (no debería) van todos.
+async function consultarPedido(referencia, siesa) {
+    let resultado;
+    try {
+        resultado = await consultar(siesa.consultaPedidos, { referencia }, siesa);
+    } catch (e) {
+        if (!(e instanceof ErrorSiesa)) throw e;
+        return { estado: 'desconocido', mensaje: e.message, pedidos: [] };
+    }
+    const pedidos = agruparPedidos(resultado);
+    if (!pedidos.length) return { estado: 'no_existe', mensaje: 'No hay pedido en SIESA con esa referencia.', pedidos };
+    return { estado: 'encontrado', mensaje: '', pedidos };
+}
+
+module.exports = {
+    importar, consultar, consultarTercero, consultarItem, consultarPedido, agruparPedidos,
+    documento, filas, ErrorSiesa, CODIGOS,
+};

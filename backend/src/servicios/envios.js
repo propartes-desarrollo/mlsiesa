@@ -4,9 +4,12 @@
 // Estados: enviando | importado | rechazado | error
 // Una venta 'importado' nunca se reenvía. 'enviando' funciona como candado:
 // solo un proceso puede reclamar la venta. Si el proceso se interrumpe a mitad
-// (caída del servidor), la venta queda 'enviando' y un admin debe verificar en
-// SIESA antes de liberarla: SIESA no devuelve el número del pedido creado, así
-// que reintentar a ciegas podría duplicarlo.
+// (caída del servidor), la venta queda 'enviando': ImportarXML no devuelve el
+// número del pedido, así que reintentar a ciegas podría duplicarlo. Se resuelve
+// consultando el pedido en SIESA (CONSULTA_PEDIDO_ML): si aparece, pasa a
+// 'importado'; si no, un admin la libera.
+//
+// pedido_siesa guarda el pedido tal como quedó en SIESA (número y líneas).
 // ================================================================
 const { consulta } = require('./db');
 
@@ -35,10 +38,30 @@ async function finalizar(venta, r) {
     await consulta(
         `UPDATE envios SET estado = $2, detalle = $3, tercero_creado = tercero_creado OR $4,
                 documento_pedido = $5, documento_tercero = COALESCE(NULLIF($6, ''), documento_tercero),
-                respuesta = $7, resumen = $8
+                respuesta = $7, resumen = $8,
+                pedido_siesa = COALESCE($9::jsonb, pedido_siesa),
+                pedido_consultado_en = CASE WHEN $9::jsonb IS NULL THEN pedido_consultado_en ELSE NOW() END
           WHERE venta = $1`,
         [venta, r.estado, r.detalle, Boolean(r.terceroCreado), r.documentoPedido || '',
-            r.documentoTercero || '', r.respuesta || '', JSON.stringify(r.resumen || {})]);
+            r.documentoTercero || '', r.respuesta || '', JSON.stringify(r.resumen || {}),
+            r.pedidoSiesa ? JSON.stringify(r.pedidoSiesa) : null]);
+}
+
+// Guarda el pedido consultado en SIESA. Si el pedido existe, la venta está en SIESA
+// pase lo que pase con su estado anterior (p. ej. 'enviando' sin respuesta de
+// ImportarXML): queda 'importado' y ya no se puede reenviar.
+async function guardarPedido(venta, pedidoSiesa) {
+    const { rows } = await consulta(
+        `UPDATE envios
+            SET pedido_siesa = $2::jsonb, pedido_consultado_en = NOW(),
+                estado = 'importado',
+                detalle = CASE WHEN estado <> 'importado'
+                               THEN 'Pedido encontrado en SIESA al consultarlo: ' || ($2::jsonb->>'numero')
+                               ELSE detalle END
+          WHERE venta = $1
+      RETURNING estado, detalle`,
+        [venta, JSON.stringify(pedidoSiesa)]);
+    return rows[0] || null;
 }
 
 async function liberar(venta) {
@@ -51,6 +74,7 @@ async function liberar(venta) {
 async function historial({ estado, buscar, limite = 200 }) {
     const { rows } = await consulta(
         `SELECT e.venta, e.estado, e.detalle, e.intentos, e.tercero_creado, e.resumen,
+                e.pedido_siesa->>'numero' AS pedido_numero,
                 e.creado_en, e.actualizado_en, c.archivo, u.nombre AS enviado_por
            FROM envios e
            LEFT JOIN cargues c ON c.id = e.cargue_id
@@ -58,7 +82,8 @@ async function historial({ estado, buscar, limite = 200 }) {
           WHERE ($1::text IS NULL OR e.estado = $1)
             AND ($2::text IS NULL OR e.venta ILIKE '%' || $2 || '%'
                  OR e.resumen->>'comprador' ILIKE '%' || $2 || '%'
-                 OR e.resumen->>'documento' ILIKE '%' || $2 || '%')
+                 OR e.resumen->>'documento' ILIKE '%' || $2 || '%'
+                 OR e.pedido_siesa->>'numero' ILIKE '%' || $2 || '%')
           ORDER BY e.actualizado_en DESC
           LIMIT $3`,
         [estado || null, buscar || null, limite]);
@@ -70,4 +95,4 @@ async function detalle(venta) {
     return rows[0] || null;
 }
 
-module.exports = { obtener, reclamar, finalizar, liberar, historial, detalle };
+module.exports = { obtener, reclamar, finalizar, guardarPedido, liberar, historial, detalle };

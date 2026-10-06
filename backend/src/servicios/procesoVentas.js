@@ -17,7 +17,7 @@ function vistaPrevia(venta, cfg, previo = null, municipios = {}) {
     if (tercero && !tercero.depto) {
         alertas.push(`Ciudad "${c.ciudadFact || c.ciudadEnvio}, ${c.deptoFact || c.deptoEnvio}" sin código SIESA: el tercero se crearía sin ciudad.`);
     }
-    if (c.juridica) alertas.push('Comprador empresa: revisar razón social y retenciones antes de crear el tercero.');
+    if (c.juridica) alertas.push('Comprador empresa: revisar razón social y retenciones antes de crear el tercero. Sus códigos de facturación electrónica no están definidos (solo se envía el correo FE).');
     const idBodega = documentos.bodega(venta, cfg);
     if (venta.logistica === undefined) {
         bloqueos.push('Este cargue es anterior a la separación Full / Colecta: vuelva a subir el reporte.');
@@ -106,6 +106,15 @@ async function enviar(venta, cfg, ctx, { repo, soap }, municipios = {}) {
     };
 
     try {
+        // Si el pedido ya está en SIESA (enviado antes por otra vía, o un envío anterior
+        // sin respuesta), no se vuelve a importar. Si la consulta no responde, se sigue.
+        const previo = await soap.consultarPedido(documentos.referenciaMl(venta.numero), cfg.siesa);
+        if (previo.estado === 'encontrado') {
+            registro.pedidoSiesa = previo.pedidos[0];
+            pasos.push(`Pedido ya existente en SIESA: ${previo.pedidos[0].numero}`);
+            return terminar('importado', `La venta ya estaba en SIESA como ${previo.pedidos[0].numero}; no se reenvía.`);
+        }
+
         const { ccostos, error } = await resolverCcostos(venta, cfg, soap, pasos);
         if (error) return terminar('error', error);
         lineasPedido = documentos.pedidoLineas(venta, cfg, ccostos);
@@ -131,7 +140,16 @@ async function enviar(venta, cfg, ctx, { repo, soap }, municipios = {}) {
         const r = await soap.importar(lineasPedido, cfg.siesa);
         pasos.push(`Pedido: ${r.mensaje}`);
         if (!r.exito) return terminar(r.codigo === '1' ? 'rechazado' : 'error', `Pedido: ${r.mensaje}`, r.respuesta);
-        return terminar('importado', 'Pedido importado en SIESA.', r.respuesta);
+
+        // ImportarXML no devuelve el número del pedido: se busca por la referencia.
+        const p = await soap.consultarPedido(documentos.referenciaMl(venta.numero), cfg.siesa);
+        if (p.estado === 'encontrado') {
+            registro.pedidoSiesa = p.pedidos[0];
+            pasos.push(`Pedido en SIESA: ${p.pedidos[0].numero}`);
+            return terminar('importado', `Pedido importado en SIESA: ${p.pedidos[0].numero}.`, r.respuesta);
+        }
+        pasos.push(`No se pudo leer el número del pedido: ${p.mensaje}`);
+        return terminar('importado', 'Pedido importado en SIESA (número pendiente de consultar).', r.respuesta);
     } catch (e) {
         if (!(e instanceof soap.ErrorSiesa)) {
             // Error inesperado: no se sabe si SIESA alcanzó a importar. Queda 'enviando'

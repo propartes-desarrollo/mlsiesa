@@ -2,7 +2,7 @@
 // DOCUMENTOS DEL CONECTOR a partir de una venta de Mercado Libre
 //
 //   pedidoLineas(venta)  -> 0000 / 0430 / 0431 x ítem (+FLETE) / [0432] / 9999
-//   terceroLineas(venta) -> 0000 / 0200 / 0201 / [0207] / 0046 x2 / 0047 x3 / 9999
+//   terceroLineas(venta) -> 0000 / 0200 / 0201 / [0207] / 0753 x5 (FE) / 0046 x2 / 0047 x3 / 9999
 //
 // Port de PSS_Order_Builder y PSS_Tercero_Builder (propartes-siesa-sync). Diferencias:
 //  - Los precios del reporte de ML vienen CON IVA. Se envía el neto
@@ -212,7 +212,7 @@ function terceroLineas(venta, cfg, roles = null, municipiosAdicionales = {}) {
         F_CIA: cia, F_ACTUALIZA_REG: 0,
         F201_ID_TERCERO: d.documento, F201_ID_SUCURSAL: t.sucursal,
         F201_IND_ESTADO_ACTIVO: 1, F201_DESCRIPCION_SUCURSAL: d.nombreCompleto,
-        F201_ID_MONEDA: p.moneda, F201_ID_VENDEDOR: t.vendedor,
+        F201_ID_MONEDA: p.moneda, F201_ID_VENDEDOR: t.vendedor, F201_IND_CALIFICACION: t.calificacion,
         F201_ID_COND_PAGO: t.cond_pago, F201_ID_TIPO_CLI: p.tipo_cli,
         F201_ID_LISTA_PRECIO: p.lista_precio, F201_IND_PEDIDO_BACKORDER: 0,
         F201_IND_BLOQUEADO: t.bloqueado, F201_IND_BLOQUEO_CUPO: t.bloqueo_cupo,
@@ -232,6 +232,18 @@ function terceroLineas(venta, cfg, roles = null, municipiosAdicionales = {}) {
         }));
     }
 
+    for (const fe of entidadesFe(d, t)) {
+        const comunes = {
+            F_NUMERO_REG: consec++, F_TIPO_REG: 753, F_VERSION_REG: 3, F_CIA: cia, F_ACTUALIZA_REG: t.actualiza,
+            f753_id_grupo_entidad: fe.grupo, f753_id_entidad: fe.entidad, f753_id_atributo: fe.atributo,
+            f753_dato_numerico: '00000000000000000.0000000000', f753_dato_texto: fe.texto || '',
+            f753_id_maestro: fe.maestro || '', f753_id_maestro_detalle: fe.valor || '', f753_nro_fila: 0,
+        };
+        lineas.push(fe.cliente
+            ? P.registro(L.L753C, { ...comunes, F_SUBTIPO_REG: 8, f201_id_tercero: d.documento, f201_id_sucursal: t.sucursal, f753_id_tipo_entidad: 'M201' })
+            : P.registro(L.L753T, { ...comunes, F_SUBTIPO_REG: 7, f200_id: d.documento, f753_id_tipo_entidad: 'M200' }));
+    }
+
     const sufijo = d.tipo === JURIDICA ? 'juridica' : 'natural';
     // Retenciones: una persona natural no retiene; para empresas ML no informa si son
     // agentes retenedores, así que van en 0 hasta que contabilidad defina la regla.
@@ -246,6 +258,24 @@ function terceroLineas(venta, cfg, roles = null, municipiosAdicionales = {}) {
 
     lineas.push(P.control(consec, 9999, cia));
     return lineas;
+}
+
+// Entidades dinámicas de facturación electrónica (0753). Grupos, entidades, atributos y
+// maestros salen de las plantillas de TI; los valores, de los parámetros. Para empresas
+// no hay valores definidos: solo va el correo FE.
+const GRUPO_FE = 'FE_CODIGO OBLIGACION 2.1';
+function entidadesFe(d, t) {
+    const lista = [];
+    if (d.tipo === NATURAL) {
+        lista.push(
+            { grupo: GRUPO_FE, entidad: 'EUNOECO017', atributo: 'co017_codigo_regimen', maestro: 'MUNOECO016', valor: t.fe_regimen_natural },
+            { grupo: GRUPO_FE, entidad: 'EUNOECO017', atributo: 'co017_cod_tipo_oblig', maestro: 'MUNOECO019', valor: t.fe_obligacion_natural },
+            { grupo: GRUPO_FE, entidad: 'EUNOECO031', atributo: 'co031_detalle_tributario1', maestro: 'MUNOECO035', valor: t.fe_detalle1_natural },
+            { grupo: GRUPO_FE, entidad: 'EUNOECO031', atributo: 'co031_detalle_tributario2', maestro: 'MUNOECO035', valor: t.fe_detalle2_natural },
+        );
+    }
+    if (d.email) lista.push({ cliente: true, grupo: 'Datos Cliente', entidad: 'EUNOECO011', atributo: 'co011_correo_fe', texto: d.email });
+    return lista.filter((fe) => fe.texto || String(fe.valor || '').trim());
 }
 
 // Cada registro debe medir exactamente lo que dice su layout: un desfase invalida todo.
