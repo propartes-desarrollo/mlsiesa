@@ -10,9 +10,9 @@ import { useAuth } from '../contexto/ContextoAuth';
 import { parametros } from '../api/indice';
 
 const MENU = [
-    { ruta: '/', etiqueta: 'Cargar ventas', icono: Upload, roles: ['admin', 'operador', 'consulta'] },
-    { ruta: '/historial', etiqueta: 'Historial de envíos', icono: History, roles: ['admin', 'operador', 'consulta'] },
-    { ruta: '/parametros', etiqueta: 'Parámetros SIESA', icono: SlidersHorizontal, roles: ['admin', 'operador'] },
+    { ruta: '/', etiqueta: 'Cargar ventas', icono: Upload, roles: ['admin', 'usuario'] },
+    { ruta: '/historial', etiqueta: 'Historial de envíos', icono: History, roles: ['admin', 'usuario'] },
+    { ruta: '/parametros', etiqueta: 'Configuración', icono: SlidersHorizontal, roles: ['admin'] },
     { ruta: '/usuarios', etiqueta: 'Usuarios', icono: Users, roles: ['admin'] },
 ];
 
@@ -21,13 +21,15 @@ export function EstadoSiesa({ estado }) {
     const pruebas = /prueba/i.test(estado.conexion);
     return (
         <Group gap={6}>
-            <Tooltip label="Conexión de SIESA a la que se envían los pedidos">
-                <Badge variant="light" color={pruebas ? 'yellow' : 'blue'}>Conexión: {estado.conexion}</Badge>
-            </Tooltip>
+            {pruebas && (
+                <Tooltip label="Los pedidos se crean en el ambiente de pruebas de SIESA, no en el real">
+                    <Badge variant="light" color="yellow">SIESA de pruebas</Badge>
+                </Tooltip>
+            )}
             {estado.envioActivo
                 ? <Badge variant="light" color="green">Envío activo</Badge>
-                : <Tooltip label="Un administrador debe activarlo en Parámetros SIESA"><Badge variant="light" color="orange">Solo revisión</Badge></Tooltip>}
-            {!estado.claveConfigurada && <Badge variant="light" color="red">Falta clave SIESA</Badge>}
+                : <Tooltip label="Se pueden cargar y revisar ventas, pero no enviarlas. Un administrador activa el envío."><Badge variant="light" color="orange">Solo revisión</Badge></Tooltip>}
+            {!estado.claveConfigurada && <Badge variant="light" color="red">Sin conexión con SIESA</Badge>}
         </Group>
     );
 }

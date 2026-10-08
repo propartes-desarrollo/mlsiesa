@@ -14,7 +14,7 @@ const auditoria = require('../servicios/auditoria');
 const router = express.Router();
 router.use(verificarToken, requiereRol('admin'));
 
-const ROLES = ['admin', 'operador', 'consulta'];
+const ROLES = ['admin', 'usuario'];
 const CAMPOS = 'id, correo, nombre, rol, activo, creado_en';
 
 // GET /api/usuarios

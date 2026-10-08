@@ -36,7 +36,7 @@ router.get('/estado', async (req, res, next) => {
 });
 
 // GET /api/parametros
-router.get('/', requiereRol('admin', 'operador'), async (req, res, next) => {
+router.get('/', requiereRol('admin'), async (req, res, next) => {
     try {
         res.json({ exito: true, parametros: await parametros.listar() });
     } catch (error) { next(error); }

@@ -25,9 +25,14 @@ function n(v, tam) {
     return s.padStart(tam, '0').slice(-tam);
 }
 
-// Alfanumérico: transliterado, espacios a la derecha, recortado al tamaño.
+// Alfanumérico: transliterado, en MAYÚSCULAS (política de uso del ERP: todo lo que entra
+// a SIESA va en mayúsculas), espacios a la derecha, recortado al tamaño.
+// Excepción: los correos van en minúsculas.
+const ES_CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 function a(v, tam) {
-    return ascii(String(v).replace(/[\r\n\t]/g, ' ')).slice(0, tam).padEnd(tam, ' ');
+    const texto = ascii(String(v).replace(/[\r\n\t]/g, ' '));
+    const caso = ES_CORREO.test(texto.trim()) ? texto.toLowerCase() : texto.toUpperCase();
+    return caso.slice(0, tam).padEnd(tam, ' ');
 }
 
 // Decimal: (tam - decimales - 1) enteros, punto y decimales. d(11, 20) -> 000000000000011.0000
@@ -42,14 +47,15 @@ function d(v, tam, decimales = 4) {
     return `${parte}.${dec}`;
 }
 
-// Arma un registro a partir de su layout [[campo, tamaño, tipo A|N|D], ...].
+// Arma un registro a partir de su layout [[campo, tamaño, tipo A|N|D|P], ...].
+// P = porcentaje con 2 decimales (0100.00), D = decimal con 4.
 function registro(layout, valores) {
     return layout.map(([nombre, tam, tipo]) => {
         const v = valores[nombre];
         if (v === undefined || v === null) {
-            return tipo === 'A' ? ' '.repeat(tam) : tipo === 'D' ? d(0, tam) : n(0, tam);
+            return tipo === 'A' ? ' '.repeat(tam) : tipo === 'D' ? d(0, tam) : tipo === 'P' ? d(0, tam, 2) : n(0, tam);
         }
-        return tipo === 'A' ? a(v, tam) : tipo === 'D' ? d(v, tam) : n(v, tam);
+        return tipo === 'A' ? a(v, tam) : tipo === 'D' ? d(v, tam) : tipo === 'P' ? d(v, tam, 2) : n(v, tam);
     }).join('');
 }
 

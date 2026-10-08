@@ -30,7 +30,7 @@ export default function Aplicacion() {
                         <Route index element={<CargarVentas />} />
                         <Route path="cargues/:id" element={<Cargue />} />
                         <Route path="historial" element={<Historial />} />
-                        <Route path="parametros" element={<RutaProtegida roles={['admin', 'operador']}><Parametros /></RutaProtegida>} />
+                        <Route path="parametros" element={<RutaProtegida roles={['admin']}><Parametros /></RutaProtegida>} />
                         <Route path="usuarios" element={<RutaProtegida roles={['admin']}><Usuarios /></RutaProtegida>} />
                     </Route>
                     <Route path="*" element={<Navigate to="/" replace />} />

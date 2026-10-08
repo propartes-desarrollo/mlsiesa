@@ -34,7 +34,8 @@ test('encabezado 0430 del ejemplo de TI', () => {
         f430_id_moneda_local: 'COP', f430_tasa_local: 1, f430_id_cond_pago: 'C09',
         f430_id_punto_envio: '000', f430_id_tercero_vendedor: '8603501708',
     });
-    assert.equal(linea, TI[1]);
+    // Idéntico salvo las mayúsculas: el ejemplo trae "b2b" y todo texto va en MAYÚSCULAS.
+    assert.equal(linea, TI[1].toUpperCase());
 });
 
 test('detalle 0431 del ejemplo de TI (ítem y flete)', () => {
@@ -61,9 +62,10 @@ test('primitivas de campo', () => {
     assert.equal(P.d(1, 13), '00000001.0000');
     assert.equal(P.d(19.33, 8), '019.3300');
     assert.equal(P.n('VEN0600', 4), '0600');
-    assert.equal(P.a('Andrés Gómez', 14), 'Andres Gomez  ');
-    assert.equal(P.a('línea\ncon salto', 16), 'linea con salto ');
-    assert.equal(P.a('Peña 😀', 8), 'Pena    ');
+    assert.equal(P.a('Andrés Gómez', 14), 'ANDRES GOMEZ  ');
+    assert.equal(P.a('Tienda.Virtual@Propartes.com', 30), 'tienda.virtual@propartes.com  ');
+    assert.equal(P.a('línea\ncon salto', 16), 'LINEA CON SALTO ');
+    assert.equal(P.a('Peña 😀', 8), 'PENA    ');
     assert.equal(P.ceilPesos(28600 / 1.19), 24034);
     assert.equal(P.ceilPesos(119000 / 1.19), 100000);   // sin falsos redondeos por coma flotante
 });

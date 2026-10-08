@@ -135,7 +135,7 @@ function ubicarColumnas(encabezados) {
     }
     const faltan = OBLIGATORIAS.filter((k) => cols[k] === undefined).map((k) => COLUMNAS[k][0]);
     if (faltan.length) {
-        throw new AppError(`El archivo no tiene las columnas esperadas del reporte de ventas de Mercado Libre. Faltan: ${faltan.join(', ')}`, 422);
+        throw new AppError(`Al archivo le faltan columnas del reporte de ventas de Mercado Libre: ${faltan.join(', ')}. Descárguelo de nuevo desde Mercado Libre.`, 422);
     }
     return cols;
 }
@@ -149,7 +149,7 @@ async function leerFilas(origen) {
         throw new AppError('No se pudo abrir el archivo como Excel (.xlsx). Verifique que sea el reporte de ventas descargado de Mercado Libre.', 422);
     }
     const hoja = libro.worksheets[0];
-    if (!hoja) throw new AppError('El archivo Excel no tiene hojas.', 422);
+    if (!hoja) throw new AppError('El archivo está vacío. Verifique que sea el reporte de ventas descargado de Mercado Libre.', 422);
     const filas = [];
     hoja.eachRow({ includeEmpty: true }, (fila, nro) => {
         // ExcelJS indexa desde 1: se normaliza a arreglo desde 0.
@@ -165,7 +165,7 @@ async function leer(origen, estadosExcluidos = []) {
     const filas = await leerFilas(origen);
     const filaEnc = filas.findIndex((f) => f && txt(f[0]) === '# de venta');
     if (filaEnc < 0) {
-        throw new AppError('No se encontró la fila de encabezados ("# de venta"). ¿Es el reporte de Ventas de Mercado Libre?', 422);
+        throw new AppError('Este archivo no parece ser el reporte de ventas de Mercado Libre. Descárguelo de nuevo desde Mercado Libre y vuelva a subirlo.', 422);
     }
     const cols = ubicarColumnas(filas[filaEnc]);
     const g = (fila, clave) => (cols[clave] === undefined || !fila ? null : fila[cols[clave]] ?? null);
@@ -193,10 +193,10 @@ async function leer(origen, estadosExcluidos = []) {
 
         const v = construirVenta(fila, nroFila, estado, hijas, g);
         if (paquete && hijas.length !== Number(paquete[1])) {
-            v.bloqueos.push(`El paquete dice ${paquete[1]} productos pero se encontraron ${hijas.length}.`);
+            v.bloqueos.push(`El paquete dice tener ${paquete[1]} productos, pero en el archivo hay ${hijas.length}.`);
         }
         if (excluidos.some((e) => sinTildes(estado).toLowerCase().includes(e))) {
-            v.bloqueos.push(`Estado "${estado}": no se envía.`);
+            v.bloqueos.push(`La venta está "${estado}" en Mercado Libre: no se envía a SIESA.`);
         }
         ventas.push(v);
     }
@@ -218,7 +218,7 @@ function construirVenta(fila, nroFila, estado, hijas, g) {
             // publicación hubo descuento o promoción: se avisa para revisar.
             const pagado = ingresos / cantidad;
             if (Math.abs(pagado - precio) > 1) {
-                alertas.push(`${txt(g(f, 'sku'))}: el precio de la publicación (${pesos(precio)}) difiere de lo cobrado por unidad (${pesos(pagado)}); se usa lo cobrado.`);
+                alertas.push(`${txt(g(f, 'sku'))}: el precio de la publicación ($ ${pesos(precio)}) es distinto de lo cobrado por unidad ($ ${pesos(pagado)}); se usa lo cobrado.`);
             }
             precio = pagado;
         }
@@ -229,25 +229,25 @@ function construirVenta(fila, nroFila, estado, hijas, g) {
     });
 
     for (const it of items) {
-        if (!it.sku) bloqueos.push(`Producto sin SKU: "${it.titulo}". No se puede relacionar con SIESA.`);
-        if (it.cantidad <= 0) bloqueos.push(`${it.sku || it.titulo}: cantidad inválida.`);
-        if (it.precioIva <= 0) bloqueos.push(`${it.sku || it.titulo}: precio en cero.`);
+        if (!it.sku) bloqueos.push(`La publicación "${it.titulo}" no tiene SKU: no se sabe qué producto es en SIESA.`);
+        if (it.cantidad <= 0) bloqueos.push(`${it.sku || it.titulo}: la cantidad no es válida.`);
+        if (it.precioIva <= 0) bloqueos.push(`${it.sku || it.titulo}: el precio está en cero.`);
     }
 
     const ingresos = num(g(fila, 'ingresosProductos'));
     const suma = items.reduce((s, it) => s + it.cantidad * it.precioIva, 0);
     if (hijas.length && Math.abs(suma - ingresos) > 1) {
-        alertas.push(`La suma de los productos (${pesos(suma)}) no cuadra con los ingresos del paquete (${pesos(ingresos)}).`);
+        alertas.push(`La suma de los productos ($ ${pesos(suma)}) no coincide con el total del paquete ($ ${pesos(ingresos)}).`);
     }
     if (num(g(fila, 'anulaciones')) !== 0) bloqueos.push('La venta tiene anulaciones o reembolsos.');
-    if (num(g(fila, 'descuentos')) !== 0) alertas.push(`Tiene descuentos y bonificaciones (${pesos(num(g(fila, 'descuentos')))}).`);
+    if (num(g(fila, 'descuentos')) !== 0) alertas.push(`Tiene descuentos y bonificaciones ($ ${pesos(num(g(fila, 'descuentos')))}).`);
 
     let { tipo: tipoDoc, numero: documento } = parseDocumento(g(fila, 'factDocumento'));
     const negocio = ['si', 'sí'].includes(sinTildes(txt(g(fila, 'negocio'))).toLowerCase());
     if (!documento) {
         bloqueos.push('El comprador no tiene documento de identidad en el reporte.');
     } else if (!tipoDoc) {
-        alertas.push(`Tipo de documento no reconocido ("${txt(g(fila, 'factDocumento'))}"); se usa cédula.`);
+        alertas.push(`No se reconoce el tipo de documento del comprador ("${txt(g(fila, 'factDocumento'))}"); se toma como cédula.`);
         tipoDoc = 'C';
     }
     const [ciudadFact, deptoFact] = ciudadDeptoDeDireccion(g(fila, 'factDireccion'));
@@ -258,7 +258,7 @@ function construirVenta(fila, nroFila, estado, hijas, g) {
     const formaEntrega = txt(g(fila, 'formaEntrega'));
     const tipoLogistica = logistica(formaEntrega);
     if (!tipoLogistica) {
-        bloqueos.push(`Forma de entrega "${formaEntrega || 'vacía'}": no es Full ni Colecta, no se sabe de qué bodega sale.`);
+        bloqueos.push(`La forma de entrega "${formaEntrega || 'vacía'}" no es Full ni Colecta: no se sabe de qué bodega sale.`);
     }
 
     return {

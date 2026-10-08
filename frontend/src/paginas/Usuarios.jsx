@@ -10,18 +10,18 @@ import { usuarios, mensajeError } from '../api/indice';
 import { useAuth } from '../contexto/ContextoAuth';
 
 const ROLES = [
-    { value: 'operador', label: 'Operador (carga y envía)' },
-    { value: 'consulta', label: 'Consulta (solo ve)' },
-    { value: 'admin', label: 'Administrador' },
+    { value: 'usuario', label: 'Usuario (carga y envía ventas)' },
+    { value: 'admin', label: 'Administrador (todo, incluida la configuración)' },
 ];
-const COLOR_ROL = { admin: 'grape', operador: 'blue', consulta: 'gray' };
+const NOMBRE_ROL = { admin: 'Administrador', usuario: 'Usuario' };
+const COLOR_ROL = { admin: 'grape', usuario: 'blue' };
 
 export default function Usuarios() {
     const { usuario: yo } = useAuth();
     const [lista, setLista] = useState([]);
     const [abierto, setAbierto] = useState(false);
     const form = useForm({
-        initialValues: { nombre: '', correo: '', contrasena: '', rol: 'operador' },
+        initialValues: { nombre: '', correo: '', contrasena: '', rol: 'usuario' },
         validate: {
             nombre: (v) => (v.trim().length >= 2 ? null : 'Nombre requerido'),
             correo: (v) => (/^\S+@\S+$/.test(v) ? null : 'Correo inválido'),
@@ -54,7 +54,7 @@ export default function Usuarios() {
             <Group justify="space-between">
                 <div>
                     <Title order={3}>Usuarios</Title>
-                    <Text c="dimmed" size="sm">Quién puede entrar y qué puede hacer. No hay registro público: los usuarios se crean aquí.</Text>
+                    <Text c="dimmed" size="sm">Quién puede entrar a la app. Los usuarios cargan y envían ventas; los administradores además manejan la configuración y los usuarios.</Text>
                 </div>
                 <Button leftSection={<UserPlus size={16} />} onClick={() => setAbierto(true)}>Nuevo usuario</Button>
             </Group>
@@ -69,8 +69,8 @@ export default function Usuarios() {
                                     <Table.Td fz="sm">{u.correo}</Table.Td>
                                     <Table.Td>
                                         {u.id === yo?.id
-                                            ? <Badge variant="light" color={COLOR_ROL[u.rol]}>{u.rol}</Badge>
-                                            : <Select size="xs" w={220} data={ROLES} value={u.rol} allowDeselect={false} onChange={(rol) => actualizar(u.id, { rol })} />}
+                                            ? <Badge variant="light" color={COLOR_ROL[u.rol]}>{NOMBRE_ROL[u.rol] || u.rol}</Badge>
+                                            : <Select size="xs" w={300} data={ROLES} value={u.rol} allowDeselect={false} onChange={(rol) => actualizar(u.id, { rol })} />}
                                     </Table.Td>
                                     <Table.Td><Switch checked={u.activo} disabled={u.id === yo?.id} onChange={(e) => actualizar(u.id, { activo: e.currentTarget.checked })} /></Table.Td>
                                 </Table.Tr>

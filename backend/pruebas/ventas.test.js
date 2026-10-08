@@ -90,11 +90,16 @@ describe('documentos', () => {
         assert.equal(campo(L.L430, enc, 'f430_id_tipo_docto'), 'PML');
         assert.equal(campo(L.L430, enc, 'f430_id_punto_envio').trim(), '000');
         assert.equal(campo(L.L430, enc, 'f430_id_cond_pago').trim(), 'C08');
-        assert.equal(campo(L.L430, enc, 'f430_notas').trim(), 'ML - 2000018670875084 - Colecta de Mercado Envios');
+        assert.equal(campo(L.L430, enc, 'f430_notas').trim(), 'ML - 2000018670875084 - COLECTA DE MERCADO ENVIOS');
         assert.equal(campo(L.L431, lineas[2], 'f431_id_tipo_docto'), 'PML');
         assert.equal(campo(L.L431, lineas[2], 'f431_id_bodega').trim(), 'BP150');
         assert.equal(campo(L.L431, lineas[2], 'f431_id_lista_precio').trim(), 'L04');
         assert.equal(campo(L.L431, lineas[2], 'f431_id_ccosto_movto').trim(), '7072');
+        // Días de entrega: 1 en el pedido y en cada producto; entrega = fecha de la venta + 1.
+        assert.equal(campo(L.L430, enc, 'f430_num_dias_entrega'), '001');
+        assert.equal(campo(L.L430, enc, 'f430_fecha_entrega'), '20260928');
+        assert.equal(campo(L.L431, lineas[2], 'f431_num_dias_entrega'), '001');
+        assert.equal(campo(L.L431, lineas[3], 'f431_num_dias_entrega'), '001');
         assert.equal(campo(L.L431, lineas[3], 'f431_id_ccosto_movto').trim(), '5059');
         assert.equal(campo(L.L431, lineas[2], 'f431_referencia_item').trim(), 'LM21119');
         assert.equal(campo(L.L431, lineas[2], 'f431_precio_unitario'), '000000000024034.0000');
@@ -108,7 +113,7 @@ describe('documentos', () => {
         const v = (await excelMl.leer(R1001))[0];
         const lineas = documentos.pedidoLineas(v, cfgBase());
         assert.equal(campo(L.L431, lineas[2], 'f431_id_bodega').trim(), 'BC207');
-        assert.equal(campo(L.L430, lineas[1], 'f430_notas').trim(), `ML - ${v.numero} - Mercado Envios Full`);
+        assert.equal(campo(L.L430, lineas[1], 'f430_notas').trim(), `ML - ${v.numero} - MERCADO ENVIOS FULL`);
     });
 
     test('un cargue sin Full / Colecta no se envía', async () => {
@@ -123,15 +128,18 @@ describe('documentos', () => {
         const d = documentos.datosTercero(v, cfg);
         assert.deepEqual([d.nombres, d.apellido1, d.apellido2], ['Carlos Andres', 'Rodriguez', 'Hernandez']);
         assert.deepEqual([d.depto, d.ciudad], ['76', '364']);
-        assert.equal(d.direccion, 'Calle 11, 1-21, Simón bolivar');
+        // Del "Domicilio" (columna AI), hasta el "/", sin símbolos y con la vía abreviada.
+        assert.equal(d.direccion, 'CLL 11 1 21');
         const lineas = documentos.terceroLineas(v, cfg);
+        assert.equal(campo(L.L200, lineas[1], 'F015_DIRECCION1').trim(), 'CLL 11 1 21');
+        assert.equal(campo(L.L200, lineas[1], 'F200_NOMBRES').trim(), 'CARLOS ANDRES');
         assert.deepEqual(lineas.map((l) => l.slice(7, 11)),
             ['0000', '0200', '0201', '0753', '0753', '0753', '0753', '0753', '0046', '0046', '0047', '0047', '0047', '9999']);
         // Facturación electrónica de persona natural (importa en Pruebas, 2026-10-06).
         const fe = lineas.filter((l) => l.slice(7, 11) === '0753');
         assert.deepEqual(fe.map((l) => [campo(L.L753T, l, 'f753_id_atributo').trim(), campo(L.L753T, l, 'f753_id_maestro_detalle').trim()]).slice(0, 4),
-            [['co017_codigo_regimen', '49'], ['co017_cod_tipo_oblig', 'R-99-PN'], ['co031_detalle_tributario1', '01'], ['co031_detalle_tributario2', 'ZZ']]);
-        assert.equal(campo(L.L753C, fe[4], 'f753_id_atributo').trim(), 'co011_correo_fe');
+            [['CO017_CODIGO_REGIMEN', '49'], ['CO017_COD_TIPO_OBLIG', 'R-99-PN'], ['CO031_DETALLE_TRIBUTARIO1', '01'], ['CO031_DETALLE_TRIBUTARIO2', 'ZZ']]);
+        assert.equal(campo(L.L753C, fe[4], 'f753_id_atributo').trim(), 'CO011_CORREO_FE');
         assert.equal(campo(L.L753C, fe[4], 'f753_dato_texto').trim(), 'tienda.virtual@propartes.com');
         assert.equal(campo(L.L753C, fe[4], 'f753_id_tipo_entidad').trim(), 'M201');
         assert.deepEqual(documentos.verificarLargos(lineas), []);
@@ -139,6 +147,11 @@ describe('documentos', () => {
         assert.equal(campo(L.L201, lineas[2], 'f201_id_cobrador'), '0600');
         // Obligatorio: vacío, SIESA rechaza el cliente (probado en Pruebas 2026-10-06).
         assert.equal(campo(L.L201, lineas[2], 'F201_IND_CALIFICACION'), 'A');
+        // Porcentajes en el formato de la plantilla de TI: 4 enteros + punto + 2 decimales.
+        assert.equal(campo(L.L201, lineas[2], 'F201_PORC_MAX_MARGEN'), '0100.00');
+        assert.equal(campo(L.L201, lineas[2], 'F201_PORC_MIN_MARGEN'), '0000.00');
+        assert.equal(campo(L.L201, lineas[2], 'F201_PORC_EXCESO_VENTA'), '0000.00');
+        assert.equal(campo(L.L201, lineas[2], 'f201_porc_tolerancia'), '0000.00');
         assert.equal(campo(L.L200, lineas[1], 'F200_ID_TIPO_IDENT'), 'C');
     });
 
@@ -156,6 +169,12 @@ describe('documentos', () => {
         assert.deepEqual(dane.resolver('Suba', 'Bogotá D.C.'), ['11', '001']);
         assert.deepEqual(dane.resolver('Cartagena De Indias', 'Bolivar'), ['13', '001']);
         assert.deepEqual(dane.resolver('Girón', 'Santander'), ['68', '307']);
+        // Municipios que no son capitales: listado oficial completo.
+        assert.deepEqual(dane.resolver('Cisneros', 'Antioquia'), ['05', '190']);
+        assert.deepEqual(dane.resolver('Turbaco', 'Bolivar'), ['13', '836']);
+        assert.deepEqual(dane.resolver('Cereté', 'Córdoba'), ['23', '162']);
+        assert.deepEqual(dane.resolver('Cali', 'Valle Del Cauca'), ['76', '001']);
+        assert.deepEqual(dane.resolver('Tumaco', 'Nariño'), ['52', '835']);
         assert.deepEqual(dane.resolver('Inventado', 'Antioquia'), ['', '']);
         assert.deepEqual(dane.resolver('Inventado', 'Antioquia', { '05': { inventado: '999' } }), ['05', '999']);
     });
@@ -271,14 +290,15 @@ describe('envío', async () => {
         const e = entorno({ pedido: 'red' });
         const r = await proceso.enviar(venta, e.cfg, ctx, e.deps);
         assert.equal(r.estado, 'con_error');
-        assert.match(r.mensaje, /sin red/);
+        assert.match(r.mensaje, /No fue posible comunicarse con SIESA/);
+        assert.ok(r.pasos.includes('sin red'));
     });
 
     test('tiempo agotado: queda en proceso y no se puede reenviar', async () => {
         const e = entorno({ pedido: 'timeout' });
         const r = await proceso.enviar(venta, e.cfg, ctx, e.deps);
         assert.equal(r.estado, 'en_proceso');
-        assert.match(r.mensaje, /verificar en SIESA/);
+        assert.match(r.mensaje, /no se sabe si el pedido quedó creado/);
         e.simulado.pedido = '0';
         assert.equal((await proceso.enviar(venta, e.cfg, ctx, e.deps)).estado, 'en_proceso');
         assert.equal(e.llamadas.filter((l) => l[0] === 'importar').length, 1);
@@ -288,7 +308,7 @@ describe('envío', async () => {
         const e = entorno({ yaEnSiesa: true });
         const r = await proceso.enviar(venta, e.cfg, ctx, e.deps);
         assert.equal(r.estado, 'enviada');
-        assert.match(r.mensaje, /ya estaba en SIESA como PML-123/);
+        assert.match(r.mensaje, /ya estaba en SIESA como pedido PML-123/);
         assert.ok(!e.llamadas.some((l) => l[0] === 'importar'));
         assert.equal(e.filas[venta.numero].pedidoSiesa.numero, 'PML-123');
     });

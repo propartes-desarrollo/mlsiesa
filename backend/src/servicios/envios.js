@@ -64,9 +64,21 @@ async function guardarPedido(venta, pedidoSiesa) {
     return rows[0] || null;
 }
 
+// La venta figuraba como importada pero su pedido ya no está en SIESA (lo borraron o
+// anularon allá): queda como error para poder volver a enviarla. Solo desde 'importado':
+// una venta 'enviando' (sin respuesta de ImportarXML) la sigue liberando un admin, porque
+// SIESA podría estar aún procesándola.
+async function marcarSinPedido(venta) {
+    const { rowCount } = await consulta(
+        `UPDATE envios SET estado = 'error', pedido_siesa = NULL, pedido_consultado_en = NOW(),
+                detalle = 'El pedido ya no está en SIESA (fue borrado o anulado): se puede volver a enviar.'
+          WHERE venta = $1 AND estado = 'importado'`, [venta]);
+    return rowCount === 1;
+}
+
 async function liberar(venta) {
     const { rowCount } = await consulta(
-        `UPDATE envios SET estado = 'error', detalle = 'Liberada por un administrador tras verificar en SIESA.'
+        `UPDATE envios SET estado = 'error', detalle = 'Habilitada por un administrador para volver a enviar.'
           WHERE venta = $1 AND estado = 'enviando'`, [venta]);
     return rowCount === 1;
 }
@@ -95,4 +107,4 @@ async function detalle(venta) {
     return rows[0] || null;
 }
 
-module.exports = { obtener, reclamar, finalizar, guardarPedido, liberar, historial, detalle };
+module.exports = { obtener, reclamar, finalizar, guardarPedido, marcarSinPedido, liberar, historial, detalle };

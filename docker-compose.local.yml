@@ -1,0 +1,9 @@
+# ================================================================
+# Solo para levantar en local (Docker Desktop): publica el frontend en
+# http://localhost:8090. En el servidor no se usa: ahí entra Nginx Proxy Manager.
+#   docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+# ================================================================
+services:
+  mlsiesa_frontend:
+    ports:
+      - "8090:80"

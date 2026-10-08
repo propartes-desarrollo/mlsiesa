@@ -15,24 +15,27 @@ function vistaPrevia(venta, cfg, previo = null, municipios = {}) {
     const tercero = c.documento ? documentos.datosTercero(venta, cfg, municipios) : null;
 
     if (tercero && !tercero.depto) {
-        alertas.push(`Ciudad "${c.ciudadFact || c.ciudadEnvio}, ${c.deptoFact || c.deptoEnvio}" sin código SIESA: el tercero se crearía sin ciudad.`);
+        alertas.push(`La ciudad "${c.ciudadFact || c.ciudadEnvio}, ${c.deptoFact || c.deptoEnvio}" no está registrada en la app: si el comprador es nuevo, quedaría en SIESA sin ciudad. Un administrador puede agregarla.`);
     }
-    if (c.juridica) alertas.push('Comprador empresa: revisar razón social y retenciones antes de crear el tercero. Sus códigos de facturación electrónica no están definidos (solo se envía el correo FE).');
+    if (c.juridica) alertas.push('El comprador es una empresa: si no está registrada en SIESA, un administrador debe revisar sus datos tributarios antes de enviar.');
     const idBodega = documentos.bodega(venta, cfg);
     if (venta.logistica === undefined) {
-        bloqueos.push('Este cargue es anterior a la separación Full / Colecta: vuelva a subir el reporte.');
+        bloqueos.push('Este archivo se cargó con una versión anterior de la app: vuelva a subirlo.');
     } else if (venta.logistica && !idBodega) {
-        bloqueos.push(`No hay bodega configurada para las ventas ${documentos.LOGISTICA[venta.logistica]}.`);
+        bloqueos.push(`No hay bodega configurada para las ventas ${documentos.LOGISTICA[venta.logistica]}. Avise al administrador.`);
     }
 
-    if (!bloqueos.length) bloqueos.push(...documentos.verificarLargos(documentos.pedidoLineas(venta, cfg)));
+    // Un registro con el largo equivocado no debería pasar nunca: el detalle queda en el log.
+    if (!bloqueos.length && documentos.verificarLargos(documentos.pedidoLineas(venta, cfg)).length) {
+        bloqueos.push('No se pudo preparar el pedido de esta venta. Avise al administrador.');
+    }
 
     const detalle = documentos.lineasDetalle(venta, cfg);
     const totalNeto = detalle.reduce((s, d) => s + d.cantidad * d.precioNeto, 0);
     const totalSiesa = Math.round(totalNeto * (1 + cfg.pedido.iva_pct / 100));
     const totalMl = Math.round(totalIva(venta) * 100) / 100;
     if (Math.abs(totalSiesa - totalMl) > detalle.length * 2) {
-        alertas.push(`El total que liquidará SIESA (~${totalSiesa.toLocaleString('es-CO')}) difiere de lo cobrado en ML (${totalMl.toLocaleString('es-CO')}).`);
+        alertas.push(`El total con IVA en SIESA (aprox. $ ${totalSiesa.toLocaleString('es-CO')}) es distinto de lo cobrado en Mercado Libre ($ ${totalMl.toLocaleString('es-CO')}).`);
     }
 
     return {
@@ -67,11 +70,14 @@ async function resolverCcostos(venta, cfg, soap, pasos) {
             ccostos[sku] = r.ccosto;
             pasos.push(`Ítem ${sku}: centro de costo ${r.ccosto}`);
         } else if (r.estado === 'no_existe') {
-            return { ccostos, error: `${r.mensaje} Revisar el SKU de la publicación en Mercado Libre.` };
+            pasos.push(`Ítem ${sku}: ${r.mensaje}`);
+            return { ccostos, error: `El producto ${sku} no existe en SIESA. Revise el SKU de la publicación en Mercado Libre.` };
         } else if (cfg.pedido.ccosto) {
             pasos.push(`Ítem ${sku}: ${r.mensaje} Se usa el centro de costo de respaldo ${cfg.pedido.ccosto}.`);
         } else {
-            return { ccostos, error: `${r.mensaje} Sin centro de costo SIESA rechaza el pedido.` };
+            // Sin centro de costo, SIESA rechaza el pedido.
+            pasos.push(`Ítem ${sku}: ${r.mensaje}`);
+            return { ccostos, error: `No se pudo obtener la información del producto ${sku} en SIESA. Intente de nuevo en unos minutos.` };
         }
     }
     return { ccostos, error: '' };
@@ -85,7 +91,7 @@ async function enviar(venta, cfg, ctx, { repo, soap }, municipios = {}) {
     if (!(await repo.reclamar(venta.numero, ctx))) {
         const previo = (await repo.obtener([venta.numero]))[venta.numero];
         return previo?.estado === 'importado'
-            ? { estado: 'enviada', mensaje: 'Ya se había importado en SIESA; no se reenvía.', pasos: [] }
+            ? { estado: 'enviada', mensaje: 'Esta venta ya se había enviado a SIESA; no se vuelve a enviar.', pasos: [] }
             : { estado: 'en_proceso', mensaje: 'Otra persona está enviando esta venta en este momento.', pasos: [] };
     }
 
@@ -112,7 +118,7 @@ async function enviar(venta, cfg, ctx, { repo, soap }, municipios = {}) {
         if (previo.estado === 'encontrado') {
             registro.pedidoSiesa = previo.pedidos[0];
             pasos.push(`Pedido ya existente en SIESA: ${previo.pedidos[0].numero}`);
-            return terminar('importado', `La venta ya estaba en SIESA como ${previo.pedidos[0].numero}; no se reenvía.`);
+            return terminar('importado', `Esta venta ya estaba en SIESA como pedido ${previo.pedidos[0].numero}; no se vuelve a enviar.`);
         }
 
         const { ccostos, error } = await resolverCcostos(venta, cfg, soap, pasos);
@@ -123,33 +129,33 @@ async function enviar(venta, cfg, ctx, { repo, soap }, municipios = {}) {
         if (cfg.envio.validar_tercero) {
             const t = await soap.consultarTercero(venta.comprador.documento, cfg.siesa);
             pasos.push(`Tercero ${venta.comprador.documento}: ${t.estado}${t.mensaje ? ` (${t.mensaje})` : ''}`);
-            if (t.estado === 'inactivo') return terminar('error', 'El comprador está inactivo en SIESA. Revisar con cartera o TI.');
+            if (t.estado === 'inactivo') return terminar('error', 'El comprador está inactivo en SIESA. Pida a cartera que lo active y vuelva a enviar.');
             if (t.estado === 'no_existe') {
                 if (!cfg.envio.crear_tercero) {
-                    return terminar('error', 'El comprador no existe en SIESA y la creación de terceros está desactivada. Crearlo en SIESA y volver a enviar.');
+                    return terminar('error', 'El comprador no está registrado en SIESA. Regístrelo en SIESA (o pida a un administrador que active el registro de compradores nuevos) y vuelva a enviar.');
                 }
                 const lineasTercero = documentos.terceroLineas(venta, cfg, t.tercero, municipios);
                 registro.documentoTercero = soap.documento(lineasTercero, cfg.siesa, true);
                 const r = await soap.importar(lineasTercero, cfg.siesa);
                 pasos.push(`Crear tercero: ${r.mensaje}`);
-                if (!r.exito) return terminar(r.codigo === '1' ? 'rechazado' : 'error', `No se pudo crear el tercero: ${r.mensaje}`, r.respuesta);
+                if (!r.exito) return terminar(r.codigo === '1' ? 'rechazado' : 'error', 'SIESA no aceptó el registro del comprador como cliente. Avise al administrador.', r.respuesta);
                 registro.terceroCreado = true;
             }
         }
 
         const r = await soap.importar(lineasPedido, cfg.siesa);
         pasos.push(`Pedido: ${r.mensaje}`);
-        if (!r.exito) return terminar(r.codigo === '1' ? 'rechazado' : 'error', `Pedido: ${r.mensaje}`, r.respuesta);
+        if (!r.exito) return terminar(r.codigo === '1' ? 'rechazado' : 'error', 'SIESA no aceptó el pedido. Avise al administrador para revisar los datos.', r.respuesta);
 
         // ImportarXML no devuelve el número del pedido: se busca por la referencia.
         const p = await soap.consultarPedido(documentos.referenciaMl(venta.numero), cfg.siesa);
         if (p.estado === 'encontrado') {
             registro.pedidoSiesa = p.pedidos[0];
             pasos.push(`Pedido en SIESA: ${p.pedidos[0].numero}`);
-            return terminar('importado', `Pedido importado en SIESA: ${p.pedidos[0].numero}.`, r.respuesta);
+            return terminar('importado', `Pedido ${p.pedidos[0].numero} creado en SIESA.`, r.respuesta);
         }
         pasos.push(`No se pudo leer el número del pedido: ${p.mensaje}`);
-        return terminar('importado', 'Pedido importado en SIESA (número pendiente de consultar).', r.respuesta);
+        return terminar('importado', 'Pedido creado en SIESA. El número se puede consultar en el Historial.', r.respuesta);
     } catch (e) {
         if (!(e instanceof soap.ErrorSiesa)) {
             // Error inesperado: no se sabe si SIESA alcanzó a importar. Queda 'enviando'
@@ -159,9 +165,9 @@ async function enviar(venta, cfg, ctx, { repo, soap }, municipios = {}) {
         pasos.push(e.message);
         if (e.incierto) {
             // Queda 'enviando' (bloqueada): un admin verifica en SIESA y la libera si no entró.
-            return terminar('enviando', `${e.message} No se sabe si SIESA registró el documento: verificar en SIESA antes de reintentar.`);
+            return terminar('enviando', 'SIESA no respondió a tiempo y no se sabe si el pedido quedó creado. Consulte la venta en el Historial antes de volver a enviarla.');
         }
-        return terminar('error', e.message);
+        return terminar('error', 'No fue posible comunicarse con SIESA. Intente de nuevo en unos minutos.');
     }
 }
 

@@ -26,6 +26,9 @@ El orden de implementación está en [`docs/orden_implementacion.md`](docs/orden
    con sus líneas, bodega, IVA y total tal como quedaron en el ERP, el documento enviado y la
    respuesta de SIESA. "Consultar en SIESA" vuelve a leer el pedido.
 
+Si un pedido se borra o anula en SIESA, "Consultar en SIESA" lo detecta y deja la venta
+habilitada para volver a enviarla.
+
 `ImportarXML` no devuelve el número del pedido creado: después de importar, la app lo busca
 con `CONSULTA_PEDIDO_ML` por el documento de referencia. La misma consulta se hace **antes**
 de enviar: si la venta ya está en SIESA, no se reenvía.
@@ -39,6 +42,8 @@ de enviar: si la venta ya está en SIESA, no se reenvía.
 | Cantidad / precio | Unidades / "Ingresos por productos" ÷ unidades, **pasado a neto** (÷ 1,19) y subido a peso entero |
 | Línea `FLETE` | "Ingresos por envío" (solo si el comprador pagó envío), en neto |
 | `f430_num_docto_referencia` | Los 15 últimos dígitos del # de venta (tiene 16) |
+| Dirección (cliente nuevo y envío) | "Domicilio" (columna AI) hasta el `/`, sin símbolos (`#`, `,`, `-`...) y con la vía abreviada: `Carrera 78A #80-21Sur` → `CR 78A 80 21SUR` (Calle → `CLL`, Carrera → `CR`, Avenida → `AV`, Transversal → `TV`, Diagonal → `DG`). Lo que sigue al `/` va como segundo renglón de la dirección de envío |
+| Mayúsculas | **Todo** lo que se envía a SIESA va en MAYÚSCULAS (política del ERP), salvo los correos, que van en minúsculas |
 | `f430_notas` | `ML - <# de venta completo> - Mercado Envíos Full` o `- Colecta de Mercado Envíos` |
 | Bodega (`f431_id_bodega`) | "Forma de entrega": **Full** → `BC207` (bodega de ML con productos nuestros), **Colecta** → `BP150` (nuestra bodega, donde recoge el carro de ML). Otra forma de entrega bloquea la venta |
 | Centro de costo (`f431_id_ccosto_movto`) | El **del ítem en SIESA**, consultado al enviar (`CONSULTA_ITEM_ML`). El flete usa `pedido.ccosto_flete` |
@@ -59,9 +64,11 @@ de enviar: si la venta ya está en SIESA, no se reenvía.
 
 | Rol | Puede |
 |---|---|
-| `admin` | Todo, más los parámetros SIESA, los municipios, los usuarios y liberar envíos |
-| `operador` | Cargar reportes, revisar y enviar a SIESA |
-| `consulta` | Ver cargues e historial |
+| Administrador (`admin`) | Todo: además de lo del usuario, la Configuración, los municipios, los usuarios, ver el archivo técnico enviado a SIESA y habilitar ventas sin confirmar |
+| Usuario (`usuario`) | Cargar el Excel, revisar las ventas, enviarlas a SIESA y consultar el Historial |
+
+La migración `db/migraciones/0002_roles_admin_usuario.sql` pasa los antiguos roles
+`operador` y `consulta` a `usuario`.
 
 No hay registro público: el admin crea los usuarios en la pantalla **Usuarios**.
 
@@ -104,6 +111,17 @@ Comprueban, entre otras cosas, que:
 > Los reportes reales de ML traen datos personales de los compradores: **no se versionan**
 > (`.gitignore`). Para pruebas, usar las copias anonimizadas.
 
+## Probar en local con Docker Desktop
+
+`docker-compose.local.yml` publica el frontend en **http://localhost:8090** (del 8080 al 8087
+están ocupados por otras apps). Requiere `.env` en la raíz y `backend/.env` con la misma
+contraseña de la BD.
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.local.yml up -d --build
+docker exec -it mlsiesa_backend node scripts/crearAdmin.js admin@propartes.com "Nombre" "contrasena"
+```
+
 ## Despliegue (Docker)
 
 ```bash
@@ -125,6 +143,14 @@ Virtuales, el mismo de B2C), bodegas `BC207` (Full) y `BP150` (Colecta).
 El punto de envío va en `000`: es el único que acepta SIESA (con `T01` rechaza el pedido;
 hallazgo de `propartes-siesa-sync`).
 
+## Ciudades
+
+La ciudad del comprador se convierte al código DANE con el listado oficial completo
+(`backend/src/servicios/datos/divipola.json`, 1.122 municipios de datos.gov.co) más unos
+alias para los nombres cortos que usa Mercado Libre (Cali, Cartagena, Cúcuta, Tumaco,
+Mompós). Si aun así una ciudad no se reconoce, el administrador la agrega en
+Configuración → Municipios.
+
 ## Creación de terceros
 
 Si el comprador no existe en SIESA, la app lo crea en un solo documento, antes del pedido:
@@ -132,7 +158,7 @@ Si el comprador no existe en SIESA, la app lo crea en un solo documento, antes d
 | Registro | Qué crea |
 |---|---|
 | `0200` | El tercero (nombres y apellidos separados, ciudad DANE) |
-| `0201` | El cliente, sucursal `001`: vendedor/cobrador `0600`, `C08`, tipo `6000`, lista `L04`, calificación `A` (obligatoria) |
+| `0201` | El cliente, sucursal `001`: vendedor/cobrador `0600`, `C08`, tipo `6000`, lista `L04`, calificación `A` (obligatoria), margen máximo `0100.00` |
 | `0753` x4 | Facturación electrónica 2.1 (persona natural): régimen `49`, obligación `R-99-PN`, detalle tributario 1 `01`, detalle tributario 2 `ZZ` |
 | `0753` x1 | Correo FE del cliente: `tienda.virtual@propartes.com` (ML no entrega el correo del comprador) |
 | `0046` / `0047` | Impuestos (IVA) y retenciones (ninguna) |
@@ -149,5 +175,4 @@ Hay que cerrarlos con TI y contabilidad. Ninguno bloquea la revisión de las ven
    empresas faltan sus códigos FE y las retenciones (ver "Creación de terceros").
 2. **Precios con IVA**: se asume IVA 19 % para todo producto. Un ítem exento quedaría con el
    neto mal calculado.
-3. **Códigos de ciudad**: confirmar que el maestro de SIESA usa DIVIPOLA/DANE.
-4. **Conexión de producción**: hoy `SIESA_CONEXION=Pruebas`.
+3. **Conexión de producción**: hoy `SIESA_CONEXION=Pruebas`.

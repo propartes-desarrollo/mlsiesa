@@ -1,11 +1,11 @@
 // ================================================================
-// PÁGINA: PARÁMETROS SIESA - valores del documento y municipios adicionales
-// El admin edita; el operador solo consulta.
+// PÁGINA: CONFIGURACIÓN (solo admin) - valores con que se crean pedidos y clientes
+// en SIESA, y municipios adicionales. Los técnicos van en la pestaña Avanzado.
 // ================================================================
 import { useEffect, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import {
-    Stack, Title, Text, Paper, Table, Badge, TextInput, Switch, Button, Group, Alert, Tooltip,
+    Stack, Title, Text, Paper, Table, TextInput, Switch, Button, Group, Alert, Tooltip,
     ActionIcon, Select, Tabs, NumberInput,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
@@ -13,7 +13,20 @@ import { RotateCcw, Save, AlertTriangle } from 'lucide-react';
 import { parametros, mensajeError } from '../api/indice';
 import { useAuth } from '../contexto/ContextoAuth';
 
-const GRUPOS = { envio: 'Envío', pedido: 'Pedido (0430 / 0431)', tercero: 'Tercero (0200 / 0201)', ml: 'Mercado Libre' };
+// Pestañas: [id, título, filtro]
+const GRUPOS = [
+    ['envio', 'Envío a SIESA', (p) => p.clave.startsWith('envio.')],
+    ['pedido', 'Pedido', (p) => p.clave.startsWith('pedido.') && !p.avanzado],
+    ['tercero', 'Cliente nuevo', (p) => p.clave.startsWith('tercero.') && !p.avanzado],
+    ['ml', 'Mercado Libre', (p) => p.clave.startsWith('ml.')],
+    ['avanzado', 'Avanzado', (p) => p.avanzado],
+];
+
+const mostrar = (p, v) => {
+    if (p.tipo === 'booleano') return v ? 'Encendido' : 'Apagado';
+    if (p.tipo === 'lista') return v.join(', ');
+    return String(v) || '(vacío)';
+};
 
 function FilaParametro({ p, editable, alGuardar, alRestaurar }) {
     const [valor, setValor] = useState(p.tipo === 'lista' ? p.valor.join(', ') : p.valor);
@@ -33,7 +46,7 @@ function FilaParametro({ p, editable, alGuardar, alRestaurar }) {
 
     return (
         <Table.Tr>
-            <Table.Td ff="monospace" fz="xs">{p.clave.split('.')[1]}</Table.Td>
+            <Table.Td fz="sm" fw={600} w={240}>{p.nombre}</Table.Td>
             <Table.Td>
                 <Group gap="xs" wrap="nowrap">
                     {control}
@@ -44,12 +57,11 @@ function FilaParametro({ p, editable, alGuardar, alRestaurar }) {
             </Table.Td>
             <Table.Td fz="sm">
                 {p.descripcion}
-                {p.confirmar && <Badge ml={6} size="xs" variant="light" color="yellow">confirmar con TI</Badge>}
-                {p.modificado && <Text size="xs" c="dimmed">Por defecto: {String(p.tipo === 'lista' ? p.defecto.join(', ') : p.defecto) || '(vacío)'}</Text>}
+                {p.modificado && <Text size="xs" c="dimmed">Valor original: {mostrar(p, p.defecto)}</Text>}
             </Table.Td>
             <Table.Td w={40}>
                 {editable && p.modificado && (
-                    <Tooltip label="Volver al valor por defecto">
+                    <Tooltip label="Volver al valor original">
                         <ActionIcon variant="subtle" color="gray" aria-label="Restaurar" onClick={() => alRestaurar(p.clave)}><RotateCcw size={14} /></ActionIcon>
                     </Tooltip>
                 )}
@@ -78,8 +90,8 @@ function Municipios({ editable }) {
     return (
         <Stack>
             <Text size="sm" c="dimmed">
-                La app trae los códigos DANE de las capitales y de los municipios más frecuentes. Si una venta llega de una ciudad
-                sin código, agréguela aquí (código DIVIPOLA de 3 dígitos del municipio).
+                La app reconoce las capitales y los municipios más frecuentes. Si una venta llega de una ciudad que no reconoce,
+                agréguela aquí con el código de 3 dígitos del municipio (código DANE).
             </Text>
             {editable && (
                 <Group align="end">
@@ -114,7 +126,7 @@ export default function Parametros() {
             const { data } = await parametros.guardar(clave, valor);
             setLista(data.parametros);
             recargarEstado?.();
-            notifications.show({ color: 'green', message: `${clave} actualizado.` });
+            notifications.show({ color: 'green', message: `${lista.find((p) => p.clave === clave)?.nombre || 'Valor'} actualizado.` });
         } catch (e) { notifications.show({ color: 'red', message: mensajeError(e) }); }
     }
     async function restaurar(clave) {
@@ -128,28 +140,32 @@ export default function Parametros() {
     return (
         <Stack maw={1200}>
             <div>
-                <Title order={3}>Parámetros SIESA</Title>
+                <Title order={3}>Configuración</Title>
                 <Text c="dimmed" size="sm">
-                    Valores con los que se arma el pedido y el tercero en SIESA. Los marcados "confirmar con TI" se tomaron de la tienda B2C y pueden ser distintos para Mercado Libre.
+                    Valores con los que se crean en SIESA los pedidos de Mercado Libre y los clientes nuevos.
                 </Text>
             </div>
-            {!esAdmin && <Alert color="gray">Solo un administrador puede cambiar estos valores.</Alert>}
-            <Alert color="orange" icon={<AlertTriangle size={18} />}>
-                La conexión, el usuario y la clave de SIESA se configuran en el servidor (archivo backend/.env), no aquí.
+            <Alert color="gray" icon={<AlertTriangle size={18} />}>
+                La conexión con SIESA (usuario y clave) la configura el equipo de sistemas en el servidor.
             </Alert>
             <Tabs defaultValue="envio">
                 <Tabs.List>
-                    {Object.entries(GRUPOS).map(([k, t]) => <Tabs.Tab key={k} value={k}>{t}</Tabs.Tab>)}
+                    {GRUPOS.map(([k, t]) => <Tabs.Tab key={k} value={k}>{t}</Tabs.Tab>)}
                     <Tabs.Tab value="municipios">Municipios</Tabs.Tab>
                 </Tabs.List>
-                {Object.keys(GRUPOS).map((g) => (
+                {GRUPOS.map(([g, , filtro]) => (
                     <Tabs.Panel key={g} value={g} pt="md">
+                        {g === 'avanzado' && (
+                            <Alert color="orange" mb="md" icon={<AlertTriangle size={18} />}>
+                                Valores técnicos que exige SIESA. Cámbielos solo con indicación del equipo de sistemas: un valor equivocado hace que SIESA rechace los pedidos.
+                            </Alert>
+                        )}
                         <Paper withBorder radius="md">
                             <Table.ScrollContainer minWidth={800}>
                                 <Table verticalSpacing="xs">
-                                    <Table.Thead><Table.Tr><Table.Th>Parámetro</Table.Th><Table.Th>Valor</Table.Th><Table.Th>Descripción</Table.Th><Table.Th /></Table.Tr></Table.Thead>
+                                    <Table.Thead><Table.Tr><Table.Th>Nombre</Table.Th><Table.Th>Valor</Table.Th><Table.Th>Descripción</Table.Th><Table.Th /></Table.Tr></Table.Thead>
                                     <Table.Tbody>
-                                        {lista.filter((p) => p.clave.startsWith(`${g}.`)).map((p) => (
+                                        {lista.filter(filtro).map((p) => (
                                             <FilaParametro key={p.clave} p={p} editable={esAdmin} alGuardar={guardar} alRestaurar={restaurar} />
                                         ))}
                                     </Table.Tbody>

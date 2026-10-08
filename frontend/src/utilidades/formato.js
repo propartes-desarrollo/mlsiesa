@@ -13,7 +13,7 @@ export const ESTADOS = {
     bloqueada: { color: 'red', texto: 'Bloqueada' },
     enviada: { color: 'blue', texto: 'Enviada' },
     rechazada: { color: 'red', texto: 'Rechazada' },
-    con_error: { color: 'orange', texto: 'Error' },
+    con_error: { color: 'orange', texto: 'Con error' },
     en_proceso: { color: 'grape', texto: 'Verificar' },
     enviando: { color: 'gray', texto: 'Enviando' },
 };

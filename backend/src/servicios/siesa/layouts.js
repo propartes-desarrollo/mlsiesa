@@ -1,5 +1,6 @@
 // ================================================================
-// LAYOUTS DEL CONECTOR - [campo, tamaño, tipo A|N|D]
+// LAYOUTS DEL CONECTOR - [campo, tamaño, tipo A|N|D|P]
+// P = porcentaje del cliente: 4 enteros + punto + 2 decimales (0100.00).
 // Transcritos de propartes-siesa-sync (class-pss-order-builder.php y
 // class-pss-tercero-builder.php), que salen de las especificaciones .xls de TI/U2.
 // LARGOS fija la longitud de cada registro; lo verifica pruebas/plano.test.js.
@@ -75,8 +76,8 @@ const L201 = [
     ['F201_IND_CALIFICACION', 1, 'A'], ['F201_ID_COND_PAGO', 3, 'A'], ['F201_DIAS_GRACIA', 3, 'N'],
     ['F201_CUPO_CREDITO', 21, 'N'], ['F201_ID_CLIENTE_CORP', 15, 'A'], ['F201_ID_SUCURSAL_CORP', 3, 'A'],
     ['F201_ID_TIPO_CLI', 4, 'A'], ['F201_ID_GRUPO_DSCTO', 4, 'A'], ['F201_ID_LISTA_PRECIO', 3, 'A'],
-    ['F201_IND_PEDIDO_BACKORDER', 1, 'N'], ['F201_PORC_EXCESO_VENTA', 7, 'N'], ['F201_PORC_MIN_MARGEN', 7, 'N'],
-    ['F201_PORC_MAX_MARGEN', 7, 'N'], ['F201_IND_BLOQUEADO', 1, 'N'], ['F201_IND_BLOQUEO_CUPO', 1, 'N'],
+    ['F201_IND_PEDIDO_BACKORDER', 1, 'N'], ['F201_PORC_EXCESO_VENTA', 7, 'P'], ['F201_PORC_MIN_MARGEN', 7, 'P'],
+    ['F201_PORC_MAX_MARGEN', 7, 'P'], ['F201_IND_BLOQUEADO', 1, 'N'], ['F201_IND_BLOQUEO_CUPO', 1, 'N'],
     ['F201_IND_BLOQUEO_MORA', 1, 'N'], ['F201_IND_FACTURA_UNIFICADA', 1, 'N'], ['F201_ID_CO_FACTURA', 3, 'A'],
     ['F201_NOTAS', 255, 'A'], ['F015_CONTACTO', 50, 'A'], ['F015_DIRECCION1', 40, 'A'],
     ['F015_DIRECCION2', 40, 'A'], ['F015_DIRECCION3', 40, 'A'], ['F015_ID_PAIS', 3, 'A'],
@@ -84,7 +85,7 @@ const L201 = [
     ['F015_TELEFONO', 20, 'A'], ['F015_FAX', 20, 'A'], ['F015_COD_POSTAL', 10, 'A'],
     ['F015_EMAIL', 255, 'A'], ['F201_FECHA_INGRESO', 8, 'A'], ['F201_ID_CO_MOVTO_FACTURA', 3, 'A'],
     ['F201_ID_UN_MOVTO_FACTURA', 20, 'A'], ['F201_ID_PARAMETRO_EDI', 4, 'A'], ['F201_CODIGO_EAN', 35, 'A'],
-    ['f201_fecha_cupo', 8, 'A'], ['f201_porc_tolerancia', 7, 'N'], ['f201_dia_maximo_factura', 2, 'N'],
+    ['f201_fecha_cupo', 8, 'A'], ['f201_porc_tolerancia', 7, 'P'], ['f201_dia_maximo_factura', 2, 'N'],
     ['f201_id_motivo_bloqueo', 3, 'A'], ['f201_id_cobrador', 4, 'A'], ['f201_ind_compromiso_um_emp', 1, 'N'],
     ['f201_ind_anticipo_terc_corp', 1, 'N'], ['f015_celular', 50, 'A'],
 ];

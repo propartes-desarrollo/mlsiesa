@@ -1,13 +1,16 @@
 // ================================================================
 // CÓDIGOS DANE (DIVIPOLA) - homologa ciudad/departamento de Mercado Libre
-// a F015_ID_DEPTO (2) y F015_ID_CIUDAD (3) de SIESA. El ejemplo de U2 usa
-// 11/001 para Bogotá, que es el código DANE. Pendiente: confirmar con TI que el
-// maestro de ciudades de SIESA usa DIVIPOLA para todos los municipios.
+// a F015_ID_DEPTO (2) y F015_ID_CIUDAD (3) de SIESA. SIESA usa los códigos DANE
+// (probado con terceros creados en Pruebas).
 //
-// La tabla no es exhaustiva: capitales y municipios vistos en los reportes.
-// Los que falten se agregan en la tabla municipios de la BD (ver rutas/catalogos.js).
+// Búsqueda, en este orden:
+//  1. municipios agregados por el admin (tabla municipios de la BD);
+//  2. ALIAS: nombres con que Mercado Libre escribe algunos municipios y que no son
+//     el oficial (Cali = Santiago de Cali, Cúcuta = San José de Cúcuta...);
+//  3. el listado oficial completo del DANE, datos/divipola.json (1.122 municipios,
+//     datos.gov.co, conjunto gdxc-w37w, descargado 2026-10-07).
 // Si una ciudad no se resuelve, el tercero se envía sin depto/ciudad (son
-// opcionales) y la venta queda con una alerta.
+// opcionales) y la venta queda con un aviso.
 // ================================================================
 const { sinTildes } = require('./excelMl');
 
@@ -47,7 +50,17 @@ const DEPTOS = {
     'vichada': '99'
 };
 
-const MUNICIPIOS = {
+const DIVIPOLA = require('./datos/divipola.json');
+
+// Nombres cortos frecuentes que no son el oficial del DANE.
+const ALIAS_EXTRA = {
+    '13': { 'mompox': '468', 'mompos': '468' },   // Santa Cruz de Mompox
+    '52': { 'tumaco': '835' },                    // San Andrés de Tumaco
+};
+
+// Tabla inicial, escrita a mano. Coincide con DIVIPOLA en los 75 municipios que
+// comparten nombre; se conserva por los alias (cali, cartagena, cucuta).
+const ALIAS = {
     '05': {
         'medellin': '001',
         'envigado': '266',
@@ -206,7 +219,7 @@ function resolver(ciudad, depto, adicionales = {}) {
     if (!cd) return ['', ''];
     if (cd === '11') return ['11', '001'];   // en Bogotá ML pone la localidad (Suba, Kennedy...)
     const nc = normalizar(ciudad);
-    const cc = adicionales[cd]?.[nc] || MUNICIPIOS[cd]?.[nc];
+    const cc = adicionales[cd]?.[nc] || ALIAS[cd]?.[nc] || ALIAS_EXTRA[cd]?.[nc] || DIVIPOLA[cd]?.[nc];
     return cc ? [cd, cc] : ['', ''];
 }
 

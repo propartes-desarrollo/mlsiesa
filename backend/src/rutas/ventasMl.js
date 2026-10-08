@@ -56,7 +56,7 @@ async function armarVista(cargue) {
 }
 
 // POST /api/ventas-ml/cargues  (multipart, campo "archivo")
-router.post('/cargues', requiereRol('admin', 'operador'), subida.single('archivo'), async (req, res, next) => {
+router.post('/cargues', requiereRol('admin', 'usuario'), subida.single('archivo'), async (req, res, next) => {
     try {
         if (!req.file) throw new AppError('Adjunte el Excel de ventas de Mercado Libre.', 400);
         const cfg = await parametros.cargar();
@@ -93,14 +93,14 @@ router.get('/cargues/:id', [uuidCargue], validar, async (req, res, next) => {
 
 // GET /api/ventas-ml/cargues/:id/ventas/:venta/documento?tipo=pedido|tercero
 // El XML exacto que se enviaría, con la clave enmascarada.
-router.get('/cargues/:id/ventas/:venta/documento', requiereRol('admin', 'operador'),
+router.get('/cargues/:id/ventas/:venta/documento', requiereRol('admin'),
     [uuidCargue, numeroVenta, query('tipo').optional().isIn(['pedido', 'tercero'])], validar,
     async (req, res, next) => {
         try {
             const cargue = await obtenerCargue(req.params.id);
             const venta = cargue.ventas.find((v) => v.numero === req.params.venta);
             if (!venta) throw new AppError('La venta no está en este cargue.', 404);
-            if (venta.bloqueos.length) throw new AppError(`La venta tiene bloqueos: ${venta.bloqueos.join(' ')}`, 409);
+            if (venta.bloqueos.length) throw new AppError(`Esta venta no se puede enviar: ${venta.bloqueos.join(' ')}`, 409);
             const [cfg, mapa] = await Promise.all([parametros.cargar(), municipios.mapa()]);
             const lineas = req.query.tipo === 'tercero'
                 ? documentos.terceroLineas(venta, cfg, null, mapa)
@@ -111,14 +111,14 @@ router.get('/cargues/:id/ventas/:venta/documento', requiereRol('admin', 'operado
 
 // POST /api/ventas-ml/cargues/:id/ventas/:venta/enviar
 // Una venta por petición: el frontend las recorre en orden y muestra el avance.
-router.post('/cargues/:id/ventas/:venta/enviar', requiereRol('admin', 'operador'),
+router.post('/cargues/:id/ventas/:venta/enviar', requiereRol('admin', 'usuario'),
     [uuidCargue, numeroVenta], validar, async (req, res, next) => {
         try {
             const [cfg, mapa] = await Promise.all([parametros.cargar(), municipios.mapa()]);
             if (!cfg.envio.activo) {
-                throw new AppError('El envío a SIESA está desactivado. Un administrador debe activarlo en Parámetros.', 409);
+                throw new AppError('El envío a SIESA está apagado. Un administrador debe activarlo.', 409);
             }
-            if (!cfg.siesa.clave) throw new AppError('Falta la clave del conector SIESA en el servidor (SIESA_CLAVE).', 409);
+            if (!cfg.siesa.clave) throw new AppError('La conexión con SIESA no está configurada. Avise al administrador.', 409);
 
             const cargue = await obtenerCargue(req.params.id);
             const venta = cargue.ventas.find((v) => v.numero === req.params.venta);

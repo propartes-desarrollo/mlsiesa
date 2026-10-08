@@ -15,16 +15,15 @@ $$ LANGUAGE plpgsql;
 
 -- ---------------------------------------------------------------
 -- usuarios
---   admin     parámetros SIESA, usuarios, municipios, liberar envíos
---   operador  carga reportes y envía pedidos a SIESA
---   consulta  solo ve cargues e historial
+--   admin    todo: parámetros SIESA, usuarios, municipios, liberar envíos
+--   usuario  carga ventas, las envía a SIESA y consulta el historial
 -- ---------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS usuarios (
   id             UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   correo         VARCHAR(255) UNIQUE NOT NULL,
   nombre         VARCHAR(255) NOT NULL,
   contrasena     VARCHAR(255) NOT NULL,
-  rol            VARCHAR(50) NOT NULL DEFAULT 'consulta' CHECK (rol IN ('admin', 'operador', 'consulta')),
+  rol            VARCHAR(50) NOT NULL DEFAULT 'usuario' CHECK (rol IN ('admin', 'usuario')),
   activo         BOOLEAN DEFAULT TRUE,
   creado_en      TIMESTAMPTZ DEFAULT NOW(),
   actualizado_en TIMESTAMPTZ DEFAULT NOW()

@@ -57,6 +57,31 @@ function lineasDetalle(venta, cfg, ccostos = {}) {
 }
 
 // Lo pide el equipo en todos los pedidos: "ML - <# de venta> - <forma de entrega>".
+// Dirección para SIESA. Facturación no acepta símbolos (#, comas, guiones...), y el tipo
+// de vía va abreviado. Del "Domicilio" de Mercado Libre se toma lo que va antes de "/":
+//   "Carrera 78A #80-21Sur / Referencia: Conjunto ... - Bosa, Bogotá D.C." -> "CR 78A 80 21SUR"
+const VIAS = [
+    [/^(carrera|cra|kra|kr|cr)$/, 'CR'],
+    [/^(calle|cll|cl)$/, 'CLL'],
+    [/^(avenida|av|avda)$/, 'AV'],
+    [/^(transversal|tv|tr|trans)$/, 'TV'],
+    [/^(diagonal|dg|diag)$/, 'DG'],
+];
+function direccionSiesa(texto) {
+    const palabras = P.ascii(String(texto || '').split('/')[0]).toUpperCase()
+        .replace(/[^A-Z0-9 ]+/g, ' ')         // # , - . ° y cualquier otro símbolo
+        .split(/\s+/).filter(Boolean);
+    return palabras.map((p) => {
+        const via = VIAS.find(([re]) => re.test(p.toLowerCase()));
+        return via ? via[1] : p;
+    }).join(' ');
+}
+// Lo que viene después de "/" (referencia, barrio): segundo renglón de la dirección de envío.
+function referenciaDireccion(texto) {
+    const resto = String(texto || '').split('/').slice(1).join(' ');
+    return P.ascii(resto).toUpperCase().replace(/^\s*REFERENCIA\s*:?/, '').replace(/[^A-Z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 function notas(venta) {
     return [`ML - ${venta.numero}`, FORMA_ENTREGA[venta.logistica]].filter(Boolean).join(' - ');
 }
@@ -91,8 +116,8 @@ function pedidoLineas(venta, cfg, ccostos = {}) {
         f430_id_cond_pago: p.cond_pago, f430_notas: notas(venta),
         f430_id_punto_envio: p.punto_envio, f430_id_tercero_vendedor: p.vendedor,
         f419_contacto: c.nombreEnvio || c.nombre,
-        f419_direccion1: c.direccionEnvio.slice(0, 40),
-        f419_direccion2: c.direccionEnvio.slice(40, 80),
+        f419_direccion1: direccionSiesa(c.direccionEnvio),
+        f419_direccion2: referenciaDireccion(c.direccionEnvio),
         f419_telefono: cfg.tercero.telefono_respaldo,
         f419_email: cfg.tercero.email_respaldo,
     }));
@@ -161,11 +186,16 @@ function datosTercero(venta, cfg, municipiosAdicionales = {}) {
     const t = cfg.tercero;
     const juridica = c.juridica;
     const [nombres, apellido1, apellido2] = juridica ? ['', '', ''] : partirNombre(c.nombre);
-    let [depto, ciudad] = dane.resolver(c.ciudadFact, c.deptoFact, municipiosAdicionales);
-    if (!depto) [depto, ciudad] = dane.resolver(c.ciudadEnvio, c.deptoEnvio, municipiosAdicionales);
-    // Sin ", Ciudad, Departamento" al final: eso va en los códigos.
-    const partes = c.direccionFact.split(',').map((x) => x.trim());
-    const direccion = partes.length > 2 ? partes.slice(0, -2).join(', ') : c.direccionFact;
+    // La dirección sale del "Domicilio" (envío, columna AI), así que la ciudad también:
+    // la de facturación queda de respaldo.
+    let [depto, ciudad] = dane.resolver(c.ciudadEnvio, c.deptoEnvio, municipiosAdicionales);
+    if (!depto) [depto, ciudad] = dane.resolver(c.ciudadFact, c.deptoFact, municipiosAdicionales);
+    let direccion = direccionSiesa(c.direccionEnvio);
+    if (!direccion) {
+        // Sin domicilio: la de facturación, sin ", Ciudad, Departamento" (eso va en los códigos).
+        const partes = c.direccionFact.split(',').map((x) => x.trim());
+        direccion = direccionSiesa(partes.length > 2 ? partes.slice(0, -2).join(' ') : c.direccionFact);
+    }
     return {
         documento: c.documento, dv: digitoVerificacion(c.documento),
         tipo: juridica ? JURIDICA : NATURAL,
@@ -215,6 +245,7 @@ function terceroLineas(venta, cfg, roles = null, municipiosAdicionales = {}) {
         F201_ID_MONEDA: p.moneda, F201_ID_VENDEDOR: t.vendedor, F201_IND_CALIFICACION: t.calificacion,
         F201_ID_COND_PAGO: t.cond_pago, F201_ID_TIPO_CLI: p.tipo_cli,
         F201_ID_LISTA_PRECIO: p.lista_precio, F201_IND_PEDIDO_BACKORDER: 0,
+        F201_PORC_EXCESO_VENTA: 0, F201_PORC_MIN_MARGEN: 0, F201_PORC_MAX_MARGEN: t.porc_max_margen, f201_porc_tolerancia: 0,
         F201_IND_BLOQUEADO: t.bloqueado, F201_IND_BLOQUEO_CUPO: t.bloqueo_cupo,
         F201_IND_BLOQUEO_MORA: t.bloqueo_mora, F201_IND_FACTURA_UNIFICADA: 0,
         F015_CONTACTO: d.nombreCompleto, F015_DIRECCION1: d.direccion,
@@ -289,5 +320,5 @@ function verificarLargos(lineas) {
 
 module.exports = {
     pedidoLineas, terceroLineas, lineasDetalle, datosTercero, verificarLargos,
-    neto, referenciaMl, digitoVerificacion, partirNombre, notas, bodega, LOGISTICA,
+    neto, referenciaMl, digitoVerificacion, partirNombre, notas, bodega, LOGISTICA, direccionSiesa, referenciaDireccion,
 };
