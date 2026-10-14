@@ -71,8 +71,12 @@ const DEFINICIONES = [
     ['tercero.porc_max_margen', 100, 'numero', 'Margen máximo (%)', 'Porcentaje de margen máximo del cliente nuevo.'],
     ['tercero.fe_regimen_natural', '49', 'texto', 'Factura electrónica: régimen', 'Código de régimen de la persona natural (49 = No responsable de IVA).'],
     ['tercero.fe_obligacion_natural', 'R-99-PN', 'texto', 'Factura electrónica: obligación', 'Código de obligación de la persona natural (R-99-PN = No aplica - Otros).'],
-    ['tercero.fe_detalle1_natural', '01', 'texto', 'Factura electrónica: detalle tributario 1', 'Detalle tributario 1 de la persona natural (01 = IVA).'],
-    ['tercero.fe_detalle2_natural', 'ZZ', 'texto', 'Factura electrónica: detalle tributario 2', 'Detalle tributario 2 de la persona natural (ZZ = No aplica).'],
+    ['tercero.fe_detalle1_natural', 'ZZ', 'texto', 'Factura electrónica: detalle tributario 1', 'Detalle tributario 1 de la persona natural (ZZ = No aplica).'],
+    ['tercero.fe_detalle2_natural', '', 'texto', 'Factura electrónica: detalle tributario 2', 'Detalle tributario 2 de la persona natural. Vacío = no se envía.'],
+    ['tercero.fe_regimen_juridica', '48', 'texto', 'Factura electrónica empresa: régimen', 'Código de régimen de la empresa (48 = Responsable de IVA).'],
+    ['tercero.fe_obligacion_juridica', 'R-99-PN', 'texto', 'Factura electrónica empresa: obligación', 'Código de obligación de la empresa (R-99-PN = No aplica - Otros).'],
+    ['tercero.fe_detalle1_juridica', '01', 'texto', 'Factura electrónica empresa: detalle tributario 1', 'Detalle tributario 1 de la empresa (01 = IVA).'],
+    ['tercero.fe_detalle2_juridica', '', 'texto', 'Factura electrónica empresa: detalle tributario 2', 'Detalle tributario 2 de la empresa. Vacío = no se envía.'],
 
     // Cliente nuevo, valores técnicos.
     ['tercero.sucursal', '001', 'texto', 'Sucursal', 'Sucursal con que se crea el cliente.', true],
@@ -82,10 +86,18 @@ const DEFINICIONES = [
     ['tercero.actualiza', '1', 'texto', 'Actualizar datos tributarios', 'Si el dato ya existe, se actualiza (1) o no (0).', true],    // F_ACTUALIZA_REG
     ['tercero.plan_division', 'S01', 'texto', 'Plan de clasificación', 'Plan de clasificación del cliente.', true],
     ['tercero.division', '', 'texto', 'Clasificación del cliente', 'Clasificación fija para los clientes de Mercado Libre. Vacío = sin clasificación.', true],   // registro 0207
-    ['tercero.iva_natural', '1', 'texto', 'IVA persona natural', 'Si a la persona natural se le cobra IVA (1) o no (0).', true],
-    ['tercero.ica_natural', '0', 'texto', 'ICA persona natural', 'Si a la persona natural se le cobra ICA (1) o no (0).', true],
-    ['tercero.iva_juridica', '1', 'texto', 'IVA empresa', 'Si a la empresa se le cobra IVA (1) o no (0).', true],
-    ['tercero.ica_juridica', '0', 'texto', 'ICA empresa', 'Si a la empresa se le cobra ICA (1) o no (0).', true],
+    // Registros 0046 / 0047: "clase:valor" o "clase:valor:llave", clase de 3 dígitos y valor de 2.
+    // Impuestos: 001 = IVA, 002 = ICA, 003 = INC. Retenciones: 001 = RENTA, 002 = RIVA, 003 = R.ICA,
+    // 004 = R.ICA.T, 021 = RHON, 022 = RCIM, 023 = RSER, 024 = RCOM, 025 = AUTRENTA,
+    // 030 = RETNEDOR (verificado en Pruebas). Valor 00 = no aplica / no retiene, 01 = le aplica / retenedor.
+    ['tercero.impuestos_natural', ['001:01', '002:01', '003:01'], 'lista', 'Impuestos persona natural',
+        'Impuestos de la persona natural, como clase:valor (01 = le aplica, 00 = no le aplica). 001 = IVA, 002 = ICA, 003 = Impoconsumo.', true],
+    ['tercero.retenciones_natural', ['001:00', '002:00', '003:00', '004:00', '021:00', '022:00', '023:00', '024:00', '025:01', '030:00'], 'lista', 'Retenciones persona natural',
+        'Retenciones de la persona natural, como clase:valor (01 = retenedor, 00 = no retiene). 001 = Renta, 002 = IVA, 003 = ICA, 004 = ICA T, 021 = Honorarios, 022 = CIM, 023 = Servicios, 024 = Compras, 025 = Autorretención renta, 030 = Retenedor.', true],
+    ['tercero.impuestos_juridica', ['001:01', '002:01', '003:01'], 'lista', 'Impuestos empresa',
+        'Impuestos de la empresa, como clase:valor (01 = le aplica, 00 = no le aplica). 001 = IVA, 002 = ICA, 003 = Impoconsumo.', true],
+    ['tercero.retenciones_juridica', ['001:00', '002:00', '003:00', '004:00', '021:00', '022:00', '023:00', '024:00', '025:01', '030:01'], 'lista', 'Retenciones empresa',
+        'Retenciones de la empresa, como clase:valor (01 = retenedor, 00 = no retiene). 001 = Renta, 002 = IVA, 003 = ICA, 004 = ICA T, 021 = Honorarios, 022 = CIM, 023 = Servicios, 024 = Compras, 025 = Autorretención renta, 030 = Retenedor.', true],
     // F201_IND_BLOQUEADO / CUPO / MORA: en los clientes reales van en 1 aunque estén activos.
     ['tercero.bloqueado', '1', 'texto', 'Validar bloqueo', 'Aplica al cliente las validaciones de bloqueo.', true],
     ['tercero.bloqueo_cupo', '1', 'texto', 'Validar cupo', 'Aplica al cliente las validaciones de cupo.', true],

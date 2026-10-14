@@ -100,8 +100,9 @@ router.get('/cargues/:id/ventas/:venta/documento', requiereRol('admin'),
             const cargue = await obtenerCargue(req.params.id);
             const venta = cargue.ventas.find((v) => v.numero === req.params.venta);
             if (!venta) throw new AppError('La venta no está en este cargue.', 404);
-            if (venta.bloqueos.length) throw new AppError(`Esta venta no se puede enviar: ${venta.bloqueos.join(' ')}`, 409);
             const [cfg, mapa] = await Promise.all([parametros.cargar(), municipios.mapa()]);
+            const { bloqueos } = proceso.vistaPrevia(venta, cfg, null, mapa);
+            if (bloqueos.length) throw new AppError(`Esta venta no se puede enviar: ${bloqueos.join(' ')}`, 409);
             const lineas = req.query.tipo === 'tercero'
                 ? documentos.terceroLineas(venta, cfg, null, mapa)
                 : documentos.pedidoLineas(venta, cfg);

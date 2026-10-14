@@ -159,9 +159,9 @@ Si el comprador no existe en SIESA, la app lo crea en un solo documento, antes d
 |---|---|
 | `0200` | El tercero (nombres y apellidos separados, ciudad DANE) |
 | `0201` | El cliente, sucursal `001`: vendedor/cobrador `0600`, `C08`, tipo `6000`, lista `L04`, calificación `A` (obligatoria), margen máximo `0100.00` |
-| `0753` x4 | Facturación electrónica 2.1 (persona natural): régimen `49`, obligación `R-99-PN`, detalle tributario 1 `01`, detalle tributario 2 `ZZ` |
+| `0753` x3 | Facturación electrónica 2.1 (persona natural): régimen `49`, obligación `R-99-PN`, detalle tributario 1 `ZZ` (el detalle tributario 2 no se envía) |
 | `0753` x1 | Correo FE del cliente: `tienda.virtual@propartes.com` (ML no entrega el correo del comprador) |
-| `0046` / `0047` | Impuestos (IVA) y retenciones (ninguna) |
+| `0046` / `0047` | Impuestos y retenciones según Configuración → Avanzado (`clase:valor`, clase de 3 dígitos y valor de 2). Ambos: IVA (001), ICA (002) e INC (003) le aplican; AUTRENTA (025) retenedor; RENTA, RIVA, R.ICA, R.ICA.T, RHON, RCIM, RSER y RCOM no retiene. RETNEDOR (030): empresa retenedor, persona natural no retiene |
 
 Probado en Pruebas el 2026-10-06 con terceros ficticios (`999000001` a `999000003`,
 "Prueba Mlsiesa Tercero Ficticio"): importa y queda como cliente activo.

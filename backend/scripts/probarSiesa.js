@@ -4,9 +4,9 @@
 //   node scripts/probarSiesa.js <reporte.xlsx>              solo consultas (lectura)
 //   node scripts/probarSiesa.js <reporte.xlsx> --importar N  además importa el pedido
 //                                                            de la venta N (# de venta)
-//   node scripts/probarSiesa.js <reporte.xlsx> --crear-tercero N DOC [--enviar]
-//        arma el tercero (0200/0201/0046/0047) con la dirección del comprador de la venta N,
-//        un nombre ficticio y el documento de prueba DOC. Sin --enviar solo lo muestra; con --enviar
+//   node scripts/probarSiesa.js <reporte.xlsx> --crear-tercero N DOC [--enviar] [--empresa]
+//        arma el tercero (0200/0201/0753/0046/0047) con la dirección del comprador de la venta N,
+//        un nombre ficticio y el documento de prueba DOC (con --empresa, como persona jurídica con NIT). Sin --enviar solo lo muestra; con --enviar
 //        lo importa (si DOC no existe en SIESA) y lo vuelve a consultar.
 //   node scripts/probarSiesa.js <reporte.xlsx> --pedido N    consulta el pedido de la
 //                                                            venta N en SIESA
@@ -25,11 +25,13 @@ const documentos = require('../src/servicios/siesa/documentos');
 const soap = require('../src/servicios/siesa/clienteSoap');
 
 async function main() {
-    const [archivo, bandera, ventaImportar, docPrueba, enviarTercero] = process.argv.slice(2);
+    const [archivo, bandera, ventaImportar, docPrueba, ...opciones] = process.argv.slice(2);
+    const enviarTercero = opciones.includes('--enviar');
+    const empresa = opciones.includes('--empresa');
     const valido = !bandera || (bandera === '--importar' && ventaImportar) || (bandera === '--pedido' && ventaImportar)
         || (bandera === '--crear-tercero' && ventaImportar && /^\d{5,15}$/.test(docPrueba || ''));
     if (!archivo || !valido) {
-        console.error('Uso: node scripts/probarSiesa.js <reporte.xlsx> [--importar <venta> | --pedido <venta> | --crear-tercero <venta> <documento> [--enviar]]');
+        console.error('Uso: node scripts/probarSiesa.js <reporte.xlsx> [--importar <venta> | --pedido <venta> | --crear-tercero <venta> <documento> [--enviar] [--empresa]]');
         process.exit(1);
     }
     const cfg = parametros.armar();
@@ -38,12 +40,12 @@ async function main() {
         process.exit(1);
     }
     console.log(`Conexión: ${cfg.siesa.conexion} · usuario ${cfg.siesa.usuario}`);
-    const escribe = bandera === '--importar' || (bandera === '--crear-tercero' && enviarTercero === '--enviar');
+    const escribe = bandera === '--importar' || (bandera === '--crear-tercero' && enviarTercero);
     if (escribe && cfg.siesa.conexion !== 'Pruebas') throw new Error('Este script solo escribe en la conexión Pruebas.');
 
     const ventas = await excelMl.leer(archivo, cfg.ml.estados_excluidos);
     if (bandera === '--pedido') return mostrarPedido(ventaImportar, cfg);
-    if (bandera === '--crear-tercero') return crearTercero(ventas, ventaImportar, docPrueba, enviarTercero === '--enviar', cfg);
+    if (bandera === '--crear-tercero') return crearTercero(ventas, ventaImportar, docPrueba, { enviar: enviarTercero, empresa }, cfg);
 
     const ccostos = {};
     for (const sku of [...new Set(ventas.flatMap((v) => v.items.map((it) => it.sku)).filter(Boolean))]) {
@@ -92,19 +94,25 @@ async function mostrarPedido(venta, cfg) {
     }
 }
 
-async function crearTercero(ventas, numero, doc, enviar, cfg) {
+async function crearTercero(ventas, numero, doc, { enviar, empresa }, cfg) {
     const v = ventas.find((x) => x.numero === numero);
     if (!v) throw new Error(`La venta ${numero} no está en el reporte.`);
     // Nombre ficticio: el documento es de prueba y no debe quedar asociado a un comprador real.
     // Dirección y ciudad sí son las del reporte, para probar el código DANE.
-    const prueba = { ...v, comprador: { ...v.comprador, documento: doc, tipoDoc: 'C', juridica: false, nombre: 'Prueba Mlsiesa Tercero Ficticio' } };
+    const prueba = {
+        ...v,
+        comprador: empresa
+            ? { ...v.comprador, documento: doc, tipoDoc: 'N', juridica: true, nombre: 'Prueba Mlsiesa Empresa Ficticia SAS' }
+            : { ...v.comprador, documento: doc, tipoDoc: 'C', juridica: false, nombre: 'Prueba Mlsiesa Tercero Ficticio' },
+    };
     const d = documentos.datosTercero(prueba, cfg);
-    console.log(`Tercero de prueba ${doc} (DV ${d.dv}): nombres "${d.nombres}" · apellidos "${d.apellido1}" "${d.apellido2}"`);
+    console.log(`Tercero de prueba ${doc} (DV ${d.dv}, ${empresa ? 'empresa' : 'persona natural'}): razón social "${d.razonSocial || ''}" · nombres "${d.nombres}" · apellidos "${d.apellido1}" "${d.apellido2}"`);
     console.log(`  Dirección "${d.direccion}" · ciudad ${d.depto}-${d.ciudad} · email "${d.email}" · teléfono "${d.telefono}"`);
     const lineas = documentos.terceroLineas(prueba, cfg);
     const errores = documentos.verificarLargos(lineas);
     if (errores.length) throw new Error(errores.join(' '));
     console.log(`  Registros: ${lineas.map((l) => l.slice(7, 11)).join(' ')}`);
+    for (const l of lineas.filter((x) => ['0046', '0047'].includes(x.slice(7, 11)))) console.log(`  ${l.slice(7, 11)} clase ${l.slice(37, 40)} valor ${l.slice(40, 42)}`);
 
     const antes = await soap.consultarTercero(doc, cfg.siesa);
     console.log(`Consulta antes: ${antes.estado} ${antes.mensaje}`);

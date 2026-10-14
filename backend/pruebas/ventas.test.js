@@ -49,6 +49,7 @@ describe('lectura del reporte', () => {
         assert.equal(excelMl.logistica('Mercado Envíos Full'), 'full');
         assert.equal(excelMl.logistica('Colecta de Mercado Envíos'), 'colecta');
         assert.equal(excelMl.logistica('Acordar con el vendedor'), '');
+        assert.equal(excelMl.logistica('Acuerdo con el comprador'), '');
         const ventas = await excelMl.leer(R1001);
         assert.ok(ventas.every((x) => x.logistica === 'full'));
     });
@@ -64,6 +65,23 @@ describe('lectura del reporte', () => {
         assert.deepEqual(paq.bloqueos, []);
         assert.deepEqual(paq.alertas, []);
         assert.ok(!ventas.some((v) => v.numero === '2000018718162770'));
+    });
+
+    test('"Acuerdo con el comprador" se bloquea: no se envía a SIESA', async () => {
+        const ExcelJS = require('exceljs');
+        const libro = new ExcelJS.Workbook();
+        await libro.xlsx.readFile(R0928);
+        const hoja = libro.worksheets[0];
+        hoja.getRow(7).getCell(hoja.getRow(6).values.indexOf('Forma de entrega')).value = 'Acuerdo con el comprador';
+        const v = (await excelMl.leer(Buffer.from(await libro.xlsx.writeBuffer())))[0];
+        assert.equal(v.logistica, '');
+        const pv = proceso.vistaPrevia(v, cfgBase());
+        assert.equal(pv.estado, 'bloqueada');
+        assert.match(pv.bloqueos.join(' '), /Acuerdo con el comprador.*no se envía a SIESA/);
+        // Una carga anterior con el mensaje viejo guardado muestra el nuevo, una sola vez.
+        const vieja = { ...v, bloqueos: ['La forma de entrega "Acuerdo con el comprador" no es Full ni Colecta: no se sabe de qué bodega sale.'] };
+        assert.deepEqual(proceso.vistaPrevia(vieja, cfgBase()).bloqueos,
+            ['Venta con entrega "Acuerdo con el comprador": se gestiona por fuera de esta app y no se envía a SIESA.']);
     });
 
     test('estados excluidos bloquean el envío', async () => {
@@ -134,14 +152,15 @@ describe('documentos', () => {
         assert.equal(campo(L.L200, lineas[1], 'F015_DIRECCION1').trim(), 'CLL 11 1 21');
         assert.equal(campo(L.L200, lineas[1], 'F200_NOMBRES').trim(), 'CARLOS ANDRES');
         assert.deepEqual(lineas.map((l) => l.slice(7, 11)),
-            ['0000', '0200', '0201', '0753', '0753', '0753', '0753', '0753', '0046', '0046', '0047', '0047', '0047', '9999']);
+            ['0000', '0200', '0201', '0753', '0753', '0753', '0753', '0046', '0046', '0046', ...Array(10).fill('0047'), '9999']);
         // Facturación electrónica de persona natural (importa en Pruebas, 2026-10-06).
         const fe = lineas.filter((l) => l.slice(7, 11) === '0753');
-        assert.deepEqual(fe.map((l) => [campo(L.L753T, l, 'f753_id_atributo').trim(), campo(L.L753T, l, 'f753_id_maestro_detalle').trim()]).slice(0, 4),
-            [['CO017_CODIGO_REGIMEN', '49'], ['CO017_COD_TIPO_OBLIG', 'R-99-PN'], ['CO031_DETALLE_TRIBUTARIO1', '01'], ['CO031_DETALLE_TRIBUTARIO2', 'ZZ']]);
-        assert.equal(campo(L.L753C, fe[4], 'f753_id_atributo').trim(), 'CO011_CORREO_FE');
-        assert.equal(campo(L.L753C, fe[4], 'f753_dato_texto').trim(), 'tienda.virtual@propartes.com');
-        assert.equal(campo(L.L753C, fe[4], 'f753_id_tipo_entidad').trim(), 'M201');
+        // El detalle tributario 2 va vacío por defecto: no se envía.
+        assert.deepEqual(fe.map((l) => [campo(L.L753T, l, 'f753_id_atributo').trim(), campo(L.L753T, l, 'f753_id_maestro_detalle').trim()]).slice(0, 3),
+            [['CO017_CODIGO_REGIMEN', '49'], ['CO017_COD_TIPO_OBLIG', 'R-99-PN'], ['CO031_DETALLE_TRIBUTARIO1', 'ZZ']]);
+        assert.equal(campo(L.L753C, fe[3], 'f753_id_atributo').trim(), 'CO011_CORREO_FE');
+        assert.equal(campo(L.L753C, fe[3], 'f753_dato_texto').trim(), 'tienda.virtual@propartes.com');
+        assert.equal(campo(L.L753C, fe[3], 'f753_id_tipo_entidad').trim(), 'M201');
         assert.deepEqual(documentos.verificarLargos(lineas), []);
         assert.equal(campo(L.L201, lineas[2], 'F201_ID_VENDEDOR'), '0600');
         assert.equal(campo(L.L201, lineas[2], 'f201_id_cobrador'), '0600');
@@ -153,6 +172,38 @@ describe('documentos', () => {
         assert.equal(campo(L.L201, lineas[2], 'F201_PORC_EXCESO_VENTA'), '0000.00');
         assert.equal(campo(L.L201, lineas[2], 'f201_porc_tolerancia'), '0000.00');
         assert.equal(campo(L.L200, lineas[1], 'F200_ID_TIPO_IDENT'), 'C');
+        // Impuestos y retenciones con clase de 3 dígitos y valor de 2, como la plantilla 004 de TI.
+        const tributarias = (tipo) => lineas.filter((l) => l.slice(7, 11) === tipo)
+            .map((l) => campo(L.L046, l, 'F_ID_CLASE') + campo(L.L046, l, 'F_ID_VALOR_TERCERO'));
+        // IVA, ICA e INC le aplican; retenciones: solo AUTRENTA (025) como retenedor, las demás no retiene.
+        assert.deepEqual(tributarias('0046'), ['00101', '00201', '00301']);
+        assert.deepEqual(tributarias('0047'), ['00100', '00200', '00300', '00400', '02100', '02200', '02300', '02400', '02501', '03000']);
+    });
+
+    test('tercero empresa: facturación electrónica de persona jurídica', async () => {
+        const v = (await excelMl.leer(R0928))[0];
+        const empresa = { ...v, comprador: { ...v.comprador, documento: '900123456', tipoDoc: 'N', juridica: true, nombre: 'Empresa Ficticia SAS' } };
+        const lineas = documentos.terceroLineas(empresa, cfgBase());
+        assert.equal(campo(L.L200, lineas[1], 'F200_ID_TIPO_IDENT'), 'N');
+        assert.equal(campo(L.L200, lineas[1], 'F200_IND_TIPO_TERCERO'), '2');
+        assert.equal(campo(L.L200, lineas[1], 'F200_RAZON_SOCIAL').trim(), 'EMPRESA FICTICIA SAS');
+        assert.equal(campo(L.L200, lineas[1], 'F200_DV_NIT').trim(), documentos.digitoVerificacion('900123456'));
+        const fe = lineas.filter((l) => l.slice(7, 11) === '0753' && l.slice(11, 13) === '07');
+        assert.deepEqual(fe.map((l) => [campo(L.L753T, l, 'f753_id_atributo').trim(), campo(L.L753T, l, 'f753_id_maestro_detalle').trim()]),
+            [['CO017_CODIGO_REGIMEN', '48'], ['CO017_COD_TIPO_OBLIG', 'R-99-PN'], ['CO031_DETALLE_TRIBUTARIO1', '01']]);
+        const tributarias = (tipo) => lineas.filter((l) => l.slice(7, 11) === tipo)
+            .map((l) => campo(L.L046, l, 'F_ID_CLASE') + campo(L.L046, l, 'F_ID_VALOR_TERCERO'));
+        assert.deepEqual(tributarias('0046'), ['00101', '00201', '00301']);
+        // AUTRENTA (025) y RETNEDOR (030) como retenedor.
+        assert.deepEqual(tributarias('0047'), ['00100', '00200', '00300', '00400', '02100', '02200', '02300', '02400', '02501', '03001']);
+    });
+
+    test('clases de impuesto y retención del parámetro', () => {
+        assert.deepEqual(documentos.clasesTributarias(['1:1', ' 023 : 01 : 3001 ', 'ABC:1', 'incompleto']), [
+            { clase: '001', valor: '01', llave: '' },
+            { clase: '023', valor: '01', llave: '3001' },
+            { clase: 'ABC', valor: '01', llave: '' },
+        ]);
     });
 
     test('las 40 ventas de los dos reportes quedan listas', async () => {

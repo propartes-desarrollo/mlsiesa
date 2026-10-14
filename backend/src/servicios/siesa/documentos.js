@@ -2,7 +2,7 @@
 // DOCUMENTOS DEL CONECTOR a partir de una venta de Mercado Libre
 //
 //   pedidoLineas(venta)  -> 0000 / 0430 / 0431 x ítem (+FLETE) / [0432] / 9999
-//   terceroLineas(venta) -> 0000 / 0200 / 0201 / [0207] / 0753 x5 (FE) / 0046 x2 / 0047 x3 / 9999
+//   terceroLineas(venta) -> 0000 / 0200 / 0201 / [0207] / 0753 (FE) / 0046 (impuestos) / 0047 (retenciones) / 9999
 //
 // Port de PSS_Order_Builder y PSS_Tercero_Builder (propartes-siesa-sync). Diferencias:
 //  - Los precios del reporte de ML vienen CON IVA. Se envía el neto
@@ -276,14 +276,15 @@ function terceroLineas(venta, cfg, roles = null, municipiosAdicionales = {}) {
     }
 
     const sufijo = d.tipo === JURIDICA ? 'juridica' : 'natural';
-    // Retenciones: una persona natural no retiene; para empresas ML no informa si son
-    // agentes retenedores, así que van en 0 hasta que contabilidad defina la regla.
-    const clases = [[46, 1, t[`iva_${sufijo}`]], [46, 2, t[`ica_${sufijo}`]], [47, 1, '0'], [47, 2, '0'], [47, 3, '0']];
-    for (const [tipoReg, clase, valor] of clases) {
+    const clases = [
+        ...clasesTributarias(t[`impuestos_${sufijo}`]).map((c) => ({ ...c, tipoReg: 46 })),
+        ...clasesTributarias(t[`retenciones_${sufijo}`]).map((c) => ({ ...c, tipoReg: 47 })),
+    ];
+    for (const c of clases) {
         lineas.push(P.registro(L.L046, {
-            F_NUMERO_REG: consec++, F_TIPO_REG: tipoReg, F_SUBTIPO_REG: 0, F_VERSION_REG: 1,
+            F_NUMERO_REG: consec++, F_TIPO_REG: c.tipoReg, F_SUBTIPO_REG: 0, F_VERSION_REG: 1,
             F_CIA: cia, F_ACTUALIZA_REG: t.actualiza, F_ID_TERCERO: d.documento,
-            F_ID_SUCURSAL: t.sucursal, F_ID_CLASE: clase, F_ID_VALOR_TERCERO: valor,
+            F_ID_SUCURSAL: t.sucursal, F_ID_CLASE: c.clase, F_ID_VALOR_TERCERO: c.valor, F_ID_LLAVE: c.llave,
         }));
     }
 
@@ -291,20 +292,27 @@ function terceroLineas(venta, cfg, roles = null, municipiosAdicionales = {}) {
     return lineas;
 }
 
+// Clases de impuesto o retención del parámetro ("clase:valor" o "clase:valor:llave") en el
+// formato de la plantilla 004 de TI: clase de 3 dígitos y valor de 2 (001 / 01).
+function clasesTributarias(lista = []) {
+    const rellenar = (v, n) => (/^\d+$/.test(v) ? v.padStart(n, '0') : v);
+    return lista.map((s) => String(s).split(':').map((p) => p.trim()))
+        .filter(([clase, valor]) => clase && valor)
+        .map(([clase, valor, llave = '']) => ({ clase: rellenar(clase, 3), valor: rellenar(valor, 2), llave }));
+}
+
 // Entidades dinámicas de facturación electrónica (0753). Grupos, entidades, atributos y
-// maestros salen de las plantillas de TI; los valores, de los parámetros. Para empresas
-// no hay valores definidos: solo va el correo FE.
+// maestros salen de las plantillas de TI; los valores, de los parámetros de cada tipo
+// de persona (fe_*_natural / fe_*_juridica).
 const GRUPO_FE = 'FE_CODIGO OBLIGACION 2.1';
 function entidadesFe(d, t) {
-    const lista = [];
-    if (d.tipo === NATURAL) {
-        lista.push(
-            { grupo: GRUPO_FE, entidad: 'EUNOECO017', atributo: 'co017_codigo_regimen', maestro: 'MUNOECO016', valor: t.fe_regimen_natural },
-            { grupo: GRUPO_FE, entidad: 'EUNOECO017', atributo: 'co017_cod_tipo_oblig', maestro: 'MUNOECO019', valor: t.fe_obligacion_natural },
-            { grupo: GRUPO_FE, entidad: 'EUNOECO031', atributo: 'co031_detalle_tributario1', maestro: 'MUNOECO035', valor: t.fe_detalle1_natural },
-            { grupo: GRUPO_FE, entidad: 'EUNOECO031', atributo: 'co031_detalle_tributario2', maestro: 'MUNOECO035', valor: t.fe_detalle2_natural },
-        );
-    }
+    const sufijo = d.tipo === JURIDICA ? 'juridica' : 'natural';
+    const lista = [
+        { grupo: GRUPO_FE, entidad: 'EUNOECO017', atributo: 'co017_codigo_regimen', maestro: 'MUNOECO016', valor: t[`fe_regimen_${sufijo}`] },
+        { grupo: GRUPO_FE, entidad: 'EUNOECO017', atributo: 'co017_cod_tipo_oblig', maestro: 'MUNOECO019', valor: t[`fe_obligacion_${sufijo}`] },
+        { grupo: GRUPO_FE, entidad: 'EUNOECO031', atributo: 'co031_detalle_tributario1', maestro: 'MUNOECO035', valor: t[`fe_detalle1_${sufijo}`] },
+        { grupo: GRUPO_FE, entidad: 'EUNOECO031', atributo: 'co031_detalle_tributario2', maestro: 'MUNOECO035', valor: t[`fe_detalle2_${sufijo}`] },
+    ];
     if (d.email) lista.push({ cliente: true, grupo: 'Datos Cliente', entidad: 'EUNOECO011', atributo: 'co011_correo_fe', texto: d.email });
     return lista.filter((fe) => fe.texto || String(fe.valor || '').trim());
 }
@@ -319,6 +327,6 @@ function verificarLargos(lineas) {
 }
 
 module.exports = {
-    pedidoLineas, terceroLineas, lineasDetalle, datosTercero, verificarLargos,
+    pedidoLineas, terceroLineas, lineasDetalle, datosTercero, verificarLargos, clasesTributarias,
     neto, referenciaMl, digitoVerificacion, partirNombre, notas, bodega, LOGISTICA, direccionSiesa, referenciaDireccion,
 };

@@ -4,13 +4,21 @@
 // poder probar el flujo completo sin tocar la BD ni SIESA.
 // ================================================================
 const documentos = require('./siesa/documentos');
-const { totalIva } = require('./excelMl');
+const { totalIva, bloqueoFormaEntrega } = require('./excelMl');
+
+// Bloqueos por forma de entrega que guardaban las cargas anteriores: se reemplazan por
+// el que se calcula ahora.
+const BLOQUEO_ENTREGA_GUARDADO = /^(La forma de entrega "|Venta con entrega ")/;
 
 const ESTADO_UI = { importado: 'enviada', rechazado: 'rechazada', error: 'con_error', enviando: 'en_proceso' };
 
 function vistaPrevia(venta, cfg, previo = null, municipios = {}) {
     const alertas = [...venta.alertas];
-    const bloqueos = [...venta.bloqueos];
+    const bloqueos = venta.bloqueos.filter((b) => !BLOQUEO_ENTREGA_GUARDADO.test(b));
+    if (venta.formaEntrega !== undefined) {
+        const motivo = bloqueoFormaEntrega(venta.formaEntrega);
+        if (motivo) bloqueos.push(motivo);
+    }
     const c = venta.comprador;
     const tercero = c.documento ? documentos.datosTercero(venta, cfg, municipios) : null;
 

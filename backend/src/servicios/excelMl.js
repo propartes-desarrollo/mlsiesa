@@ -57,6 +57,20 @@ const TIPOS_DOC = { CC: 'C', CE: 'E', NIT: 'N', PP: 'P', PAS: 'P', PASAPORTE: 'P
 // las hijas):
 //   full    "Mercado Envíos Full": sale de la bodega que ML tiene con productos nuestros.
 //   colecta "Colecta de Mercado Envíos": el carro de ML recoge en nuestra bodega principal.
+const ACUERDO_COMPRADOR = /acuerd\w* con el comprador/;
+
+// Motivo por el que una forma de entrega no se puede enviar ('' = se puede).
+function bloqueoFormaEntrega(formaEntrega) {
+    if (ACUERDO_COMPRADOR.test(sinTildes(formaEntrega).toLowerCase())) {
+        // Tiene un manejo distinto, por fuera de esta app.
+        return 'Venta con entrega "Acuerdo con el comprador": se gestiona por fuera de esta app y no se envía a SIESA.';
+    }
+    if (!logistica(formaEntrega)) {
+        return `La forma de entrega "${formaEntrega || 'vacía'}" no es Full ni Colecta: no se sabe de qué bodega sale.`;
+    }
+    return '';
+}
+
 function logistica(formaEntrega) {
     const f = sinTildes(formaEntrega).toLowerCase();
     if (/\bfull\b/.test(f)) return 'full';
@@ -257,9 +271,8 @@ function construirVenta(fila, nroFila, estado, hijas, g) {
 
     const formaEntrega = txt(g(fila, 'formaEntrega'));
     const tipoLogistica = logistica(formaEntrega);
-    if (!tipoLogistica) {
-        bloqueos.push(`La forma de entrega "${formaEntrega || 'vacía'}" no es Full ni Colecta: no se sabe de qué bodega sale.`);
-    }
+    // El bloqueo por forma de entrega no se guarda con la carga: lo calcula la vista
+    // previa (bloqueoFormaEntrega), para que aplique también a lo ya cargado.
 
     return {
         numero: txt(g(fila, 'venta')),
@@ -295,4 +308,4 @@ function construirVenta(fila, nroFila, estado, hijas, g) {
 
 const totalIva = (v) => v.items.reduce((s, it) => s + it.cantidad * it.precioIva, 0) + v.fleteIva;
 
-module.exports = { leer, parseFecha, parseDocumento, ciudadDeptoDeDireccion, sinTildes, totalIva, logistica };
+module.exports = { leer, parseFecha, parseDocumento, ciudadDeptoDeDireccion, sinTildes, totalIva, logistica, bloqueoFormaEntrega };
