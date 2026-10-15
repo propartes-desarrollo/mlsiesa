@@ -175,4 +175,8 @@ Hay que cerrarlos con TI y contabilidad. Ninguno bloquea la revisión de las ven
    empresas faltan sus códigos FE y las retenciones (ver "Creación de terceros").
 2. **Precios con IVA**: se asume IVA 19 % para todo producto. Un ítem exento quedaría con el
    neto mal calculado.
-3. **Conexión de producción**: hoy `SIESA_CONEXION=Pruebas`.
+3. **Conexión de producción**: hoy `SIESA_CONEXION=Pruebas` con el usuario `ia`. Para pasar a
+   producción se cambian `SIESA_CONEXION`, `SIESA_USUARIO` y `SIESA_CLAVE` en `backend/.env` del
+   servidor y se reinicia el backend. El usuario de producción necesita las tres consultas y permiso
+   para importar pedidos y terceros. En Configuración → Conexión con SIESA se ven estos datos (sin la
+   clave), solo para consulta: por seguridad no se cambian desde la app.

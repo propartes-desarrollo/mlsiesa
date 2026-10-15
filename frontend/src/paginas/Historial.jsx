@@ -107,7 +107,7 @@ export default function Historial() {
     }
 
     return (
-        <Stack maw={1300}>
+        <Stack>
             <div>
                 <Title order={3}>Historial de envíos</Title>
                 <Text c="dimmed" size="sm">Las ventas enviadas a SIESA y el pedido que se creó para cada una.</Text>

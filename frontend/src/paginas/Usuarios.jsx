@@ -50,7 +50,7 @@ export default function Usuarios() {
     }
 
     return (
-        <Stack maw={1000}>
+        <Stack>
             <Group justify="space-between">
                 <div>
                     <Title order={3}>Usuarios</Title>

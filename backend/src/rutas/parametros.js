@@ -35,6 +35,19 @@ router.get('/estado', async (req, res, next) => {
     } catch (error) { next(error); }
 });
 
+// GET /api/parametros/conexion  - datos de conexión con SIESA (solo lectura; salen de backend/.env)
+router.get('/conexion', requiereRol('admin'), (req, res) => {
+    const s = parametros.armar().siesa;
+    res.json({
+        exito: true,
+        conexion: {
+            conexion: s.conexion, cia: s.cia, usuario: s.usuario, proveedor: s.proveedor,
+            claveConfigurada: Boolean(s.clave), endpoint: s.endpoint,
+            consultas: [s.consultaTerceros, s.consultaItems, s.consultaPedidos],
+        },
+    });
+});
+
 // GET /api/parametros
 router.get('/', requiereRol('admin'), async (req, res, next) => {
     try {

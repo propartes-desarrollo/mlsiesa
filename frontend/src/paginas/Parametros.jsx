@@ -6,10 +6,10 @@ import { useEffect, useState } from 'react';
 import { useOutletContext } from 'react-router-dom';
 import {
     Stack, Title, Text, Paper, Table, TextInput, Switch, Button, Group, Alert, Tooltip,
-    ActionIcon, Select, Tabs, NumberInput,
+    ActionIcon, Select, Tabs, NumberInput, Badge,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
-import { RotateCcw, Save, AlertTriangle } from 'lucide-react';
+import { RotateCcw, Save, AlertTriangle, Lock } from 'lucide-react';
 import { parametros, mensajeError } from '../api/indice';
 import { useAuth } from '../contexto/ContextoAuth';
 
@@ -114,6 +114,45 @@ function Municipios({ editable }) {
     );
 }
 
+// Conexión con SIESA: solo lectura. Usuario, clave y ambiente salen del archivo de
+// configuración del servidor (backend/.env), no de la base de datos.
+function ConexionSiesa() {
+    const [c, setC] = useState(null);
+    useEffect(() => { parametros.conexion().then(({ data }) => setC(data.conexion)).catch(() => {}); }, []);
+    if (!c) return null;
+    const pruebas = /prueba/i.test(c.conexion);
+    const filas = [
+        ['Ambiente (conexión)', <Group gap="xs" key="c"><Text size="sm">{c.conexion}</Text><Badge size="sm" color={pruebas ? 'yellow' : 'red'} variant="light">{pruebas ? 'Pruebas' : 'Producción'}</Badge></Group>],
+        ['Usuario de SIESA', c.usuario || '(sin usuario)'],
+        ['Clave', c.claveConfigurada ? 'Configurada' : <Text key="k" size="sm" c="red">Sin configurar: no se puede enviar a SIESA</Text>],
+        ['Compañía', c.cia],
+        ['Proveedor del conector', c.proveedor],
+        ['Consultas', c.consultas.join(', ')],
+        ['Dirección del servicio', c.endpoint],
+    ];
+    return (
+        <Stack>
+            <Alert color="gray" icon={<Lock size={18} />}>
+                Por seguridad, estos datos no se pueden cambiar desde la aplicación: se configuran directamente en el
+                servidor. Si necesita cambiar el usuario, la clave o pasar de pruebas a producción, consulte con el
+                desarrollador de la aplicación para hacer el ajuste.
+            </Alert>
+            <Paper withBorder radius="md">
+                <Table verticalSpacing="xs">
+                    <Table.Tbody>
+                        {filas.map(([n, v]) => (
+                            <Table.Tr key={n}>
+                                <Table.Td w={240}><Text size="sm" fw={500}>{n}</Text></Table.Td>
+                                <Table.Td>{typeof v === 'string' ? <Text size="sm">{v}</Text> : v}</Table.Td>
+                            </Table.Tr>
+                        ))}
+                    </Table.Tbody>
+                </Table>
+            </Paper>
+        </Stack>
+    );
+}
+
 export default function Parametros() {
     const { esAdmin } = useAuth();
     const { recargarEstado } = useOutletContext() || {};
@@ -138,20 +177,18 @@ export default function Parametros() {
     }
 
     return (
-        <Stack maw={1200}>
+        <Stack>
             <div>
                 <Title order={3}>Configuración</Title>
                 <Text c="dimmed" size="sm">
                     Valores con los que se crean en SIESA los pedidos de Mercado Libre y los clientes nuevos.
                 </Text>
             </div>
-            <Alert color="gray" icon={<AlertTriangle size={18} />}>
-                La conexión con SIESA (usuario y clave) la configura el equipo de sistemas en el servidor.
-            </Alert>
             <Tabs defaultValue="envio">
                 <Tabs.List>
                     {GRUPOS.map(([k, t]) => <Tabs.Tab key={k} value={k}>{t}</Tabs.Tab>)}
                     <Tabs.Tab value="municipios">Municipios</Tabs.Tab>
+                    <Tabs.Tab value="conexion">Conexión con SIESA</Tabs.Tab>
                 </Tabs.List>
                 {GRUPOS.map(([g, , filtro]) => (
                     <Tabs.Panel key={g} value={g} pt="md">
@@ -175,6 +212,7 @@ export default function Parametros() {
                     </Tabs.Panel>
                 ))}
                 <Tabs.Panel value="municipios" pt="md"><Municipios editable={esAdmin} /></Tabs.Panel>
+                <Tabs.Panel value="conexion" pt="md"><ConexionSiesa /></Tabs.Panel>
             </Tabs>
         </Stack>
     );

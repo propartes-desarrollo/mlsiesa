@@ -35,7 +35,7 @@ export default function CargarVentas() {
     }
 
     return (
-        <Stack maw={1100}>
+        <Stack>
             <div>
                 <Title order={3}>Cargar ventas de Mercado Libre</Title>
                 <Text c="dimmed" size="sm">

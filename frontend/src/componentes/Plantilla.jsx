@@ -21,9 +21,11 @@ export function EstadoSiesa({ estado }) {
     const pruebas = /prueba/i.test(estado.conexion);
     return (
         <Group gap={6}>
-            {pruebas && (
-                <Tooltip label="Los pedidos se crean en el ambiente de pruebas de SIESA, no en el real">
-                    <Badge variant="light" color="yellow">SIESA de pruebas</Badge>
+            {estado.conexion && (
+                <Tooltip label={pruebas
+                    ? 'Los pedidos se crean en el ambiente de pruebas de SIESA, no en el real'
+                    : `Los pedidos se crean en SIESA, conexión ${estado.conexion}`}>
+                    <Badge variant="light" color={pruebas ? 'yellow' : 'blue'}>SIESA: {estado.conexion}</Badge>
                 </Tooltip>
             )}
             {estado.envioActivo

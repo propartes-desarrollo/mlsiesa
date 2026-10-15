@@ -167,7 +167,7 @@ export default function Cargue() {
     if (!datos) return <Center h={200}><Loader /></Center>;
 
     return (
-        <Stack maw={1300} pb={puedeEnviar ? 80 : 0}>
+        <Stack pb={puedeEnviar ? 80 : 0}>
             <div>
                 <Anchor component={Link} to="/" size="sm"><Group gap={4}><ArrowLeft size={14} />Archivos cargados</Group></Anchor>
                 <Title order={3}>{datos.cargue.archivo}</Title>
@@ -265,7 +265,7 @@ export default function Cargue() {
             {puedeEnviar && (
                 <Paper withBorder shadow="md" p="sm" pos="fixed" bottom={0} right={0} radius={0}
                     style={{ zIndex: 50, left: 'var(--app-shell-navbar-offset, 0rem)' }}>
-                    <Group justify="flex-end" maw={1300} mx="auto">
+                    <Group justify="flex-end">
                         <Text size="sm" c="dimmed" mr="auto">
                             {seleccion.size ? `${seleccion.size} venta(s) seleccionada(s)` : 'Seleccione las ventas que quiere enviar'}
                         </Text>

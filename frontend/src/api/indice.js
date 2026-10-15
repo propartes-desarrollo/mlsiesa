@@ -64,6 +64,7 @@ export const envios = {
 export const parametros = {
     estado: () => api.get('/parametros/estado'),
     listar: () => api.get('/parametros'),
+    conexion: () => api.get('/parametros/conexion'),
     guardar: (clave, valor) => api.put(`/parametros/${encodeURIComponent(clave)}`, { valor }),
     restaurar: (clave) => api.delete(`/parametros/${encodeURIComponent(clave)}`),
     municipios: () => api.get('/parametros/municipios'),
