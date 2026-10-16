@@ -20,6 +20,13 @@ const DEFINICIONES = [
         'Antes de crear el pedido, verifica en SIESA si el comprador ya está registrado como cliente.'],
     ['envio.crear_tercero', false, 'booleano', 'Registrar compradores nuevos',
         'Si el comprador no está registrado en SIESA, lo crea como cliente antes de crear el pedido.'],
+    // Persona natural con cédula: antes de crearla se consulta en la DIAN si tiene RUT.
+    ['envio.validar_rut', true, 'booleano', 'Validar el RUT en la DIAN',
+        'Antes de registrar a un comprador persona natural con cédula, consulta en la DIAN si tiene RUT. Si lo tiene, se registra con NIT (tipo N).'],
+    ['envio.rut_reintento_min', 10, 'numero', 'DIAN: minutos entre reintentos',
+        'Si la DIAN no responde, la venta queda en espera y se vuelve a enviar sola cada tantos minutos.'],
+    ['envio.rut_espera_max_min', 60, 'numero', 'DIAN: espera máxima (minutos)',
+        'Si la DIAN sigue sin responder pasado este tiempo, el comprador se registra con cédula y queda un aviso para revisarlo.'],
 
     // Pedido. Campos de los registros 0430 (encabezado) y 0431 (líneas).
     ['pedido.co', '021', 'texto', 'Centro de operación', 'Centro de operación al que pertenecen los pedidos.'],

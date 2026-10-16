@@ -11,6 +11,7 @@ const parametros = require('../src/servicios/parametros');
 const soapReal = require('../src/servicios/siesa/clienteSoap');
 const L = require('../src/servicios/siesa/layouts');
 const { campo } = require('../src/servicios/siesa/plano');
+const dianReal = require('../src/servicios/dian');
 
 const FIX = path.join(__dirname, 'fixtures');
 const archivo = (prefijo) => path.join(FIX, fs.readdirSync(FIX).find((f) => f.startsWith(prefijo)));
@@ -299,20 +300,29 @@ describe('documentos', () => {
 });
 
 // ── Envío con SIESA y repositorio simulados ───────────────────────
-function entorno({ tercero = 'activo', pedido = '0', terceroImport = '0', item = 'ok', yaEnSiesa = false } = {}) {
+function entorno({ tercero = 'activo', pedido = '0', terceroImport = '0', item = 'ok', yaEnSiesa = false, rut = 'sin_rut' } = {}) {
     const filas = {};
     const llamadas = [];
     const repo = {
         async obtener(ventas) { return Object.fromEntries(ventas.filter((v) => filas[v]).map((v) => [v, filas[v]])); },
         async reclamar(venta) {
             const f = filas[venta];
-            if (f && !['rechazado', 'error'].includes(f.estado)) return false;
+            if (f && !['rechazado', 'error', 'espera_dian'].includes(f.estado)) return false;
             filas[venta] = { ...(f || { intentos: 0 }), estado: 'enviando', intentos: (f?.intentos || 0) + 1 };
             return true;
         },
-        async finalizar(venta, r) { Object.assign(filas[venta], r); },
+        // Como en la BD: espera_desde y proximo_intento quedan en null salvo en espera.
+        async finalizar(venta, r) { Object.assign(filas[venta], r, { esperaDesde: r.esperaDesde || null, proximoIntento: r.proximoIntento || null }); },
     };
-    const simulado = { tercero, pedido, terceroImport, item, enSiesa: yaEnSiesa };
+    const lineasTercero = [];
+    const simulado = { tercero, pedido, terceroImport, item, enSiesa: yaEnSiesa, rut };
+    const dian = {
+        async consultarRut(doc) {
+            llamadas.push(['dian', doc]);
+            return { estado: simulado.rut, nombre: simulado.rut === 'con_rut' ? 'X' : '', mensaje: '' };
+        },
+    };
+    let reloj = new Date('2026-10-16T15:00:00Z');
     const pedidoSiesa = { numero: 'PML-123', consec: '123', lineas: [] };
     const soap = {
         ErrorSiesa: soapReal.ErrorSiesa,
@@ -331,6 +341,7 @@ function entorno({ tercero = 'activo', pedido = '0', terceroImport = '0', item =
         async importar(lineas) {
             const tipo = lineas[1].slice(7, 11);
             llamadas.push(['importar', tipo]);
+            if (tipo === '0200') lineasTercero.push(lineas);
             const cod = tipo === '0200' ? simulado.terceroImport : simulado.pedido;
             if (cod === 'red') throw new soapReal.ErrorSiesa('sin red');
             if (cod === 'timeout') throw new soapReal.ErrorSiesa('SIESA no respondió', { incierto: true });
@@ -340,7 +351,11 @@ function entorno({ tercero = 'activo', pedido = '0', terceroImport = '0', item =
     };
     const cfg = cfgBase();
     Object.assign(cfg.envio, { activo: true, validar_tercero: true, crear_tercero: true });
-    return { filas, llamadas, deps: { repo, soap }, cfg, simulado };
+    return {
+        filas, llamadas, cfg, simulado, lineasTercero,
+        deps: { repo, soap, dian, ahora: () => reloj },
+        avanzar: (min) => { reloj = new Date(reloj.getTime() + min * 60000); },
+    };
 }
 
 describe('envío', async () => {
@@ -366,7 +381,7 @@ describe('envío', async () => {
     test('crea el tercero si no existe', async () => {
         const e = entorno({ tercero: 'no_existe' });
         assert.equal((await proceso.enviar(venta, e.cfg, ctx, e.deps)).estado, 'enviada');
-        assert.deepEqual(e.llamadas.filter((l) => l[0] !== 'pedido').map((l) => l[1]), ['LM21119', '1000007919', '0200', '0430']);
+        assert.deepEqual(e.llamadas.filter((l) => l[0] !== 'pedido').map((l) => l.join(' ')), ['item LM21119', 'consulta 1000007919', 'dian 1000007919', 'importar 0200', 'importar 0430']);
         assert.equal(e.filas[venta.numero].terceroCreado, true);
     });
 
@@ -433,5 +448,72 @@ describe('envío', async () => {
         const e = entorno({ tercero: 'inactivo' });
         assert.equal((await proceso.enviar(venta, e.cfg, ctx, e.deps)).estado, 'con_error');
         assert.ok(!e.llamadas.some((l) => l[1] === '0430'));
+    });
+test('persona natural con RUT: se registra con NIT (tipo N), sigue siendo persona natural', async () => {
+        const e = entorno({ tercero: 'no_existe', rut: 'con_rut' });
+        assert.equal((await proceso.enviar(venta, e.cfg, ctx, e.deps)).estado, 'enviada');
+        const t = e.lineasTercero[0];
+        assert.equal(campo(L.L200, t[1], 'F200_ID_TIPO_IDENT'), 'N');
+        assert.equal(campo(L.L200, t[1], 'F200_IND_TIPO_TERCERO'), '1');
+        assert.equal(campo(L.L200, t[1], 'F200_DV_NIT').trim(), documentos.digitoVerificacion(venta.comprador.documento));
+        assert.equal(campo(L.L200, t[1], 'F200_NOMBRES').trim(), 'CARLOS ANDRES');
+        assert.equal(e.filas[venta.numero].resumen.conRut, true);
+    });
+
+    test('persona natural sin RUT: se registra con cédula', async () => {
+        const e = entorno({ tercero: 'no_existe' });
+        await proceso.enviar(venta, e.cfg, ctx, e.deps);
+        assert.equal(campo(L.L200, e.lineasTercero[0][1], 'F200_ID_TIPO_IDENT'), 'C');
+        assert.ok(e.llamadas.some((l) => l[0] === 'dian'));
+    });
+
+    test('DIAN caída: espera, reintenta y al final registra con cédula y avisa', async () => {
+        const e = entorno({ tercero: 'no_existe', rut: 'desconocido' });
+        let r = await proceso.enviar(venta, e.cfg, ctx, e.deps);
+        assert.equal(r.estado, 'en_espera');
+        assert.match(r.mensaje, /se enviará sola/);
+        assert.ok(!e.llamadas.some((l) => l[0] === 'importar'));
+        const fila = e.filas[venta.numero];
+        assert.equal(fila.estado, 'espera_dian');
+        assert.equal(fila.proximoIntento - fila.esperaDesde, 10 * 60000);
+        const desde = fila.esperaDesde;
+        e.avanzar(30);
+        assert.equal((await proceso.enviar(venta, e.cfg, ctx, e.deps)).estado, 'en_espera');
+        assert.equal(e.filas[venta.numero].esperaDesde.getTime(), desde.getTime());
+        e.avanzar(31);
+        r = await proceso.enviar(venta, e.cfg, ctx, e.deps);
+        assert.equal(r.estado, 'enviada');
+        assert.match(r.mensaje, /no se pudo validar si el comprador tiene RUT/);
+        assert.equal(campo(L.L200, e.lineasTercero[0][1], 'F200_ID_TIPO_IDENT'), 'C');
+        assert.match(e.filas[venta.numero].resumen.aviso, /se registró con cédula/);
+        assert.equal(e.filas[venta.numero].esperaDesde, null);
+    });
+
+    test('DIAN vuelve a responder durante la espera: sigue normal', async () => {
+        const e = entorno({ tercero: 'no_existe', rut: 'desconocido' });
+        await proceso.enviar(venta, e.cfg, ctx, e.deps);
+        e.simulado.rut = 'con_rut';
+        e.avanzar(10);
+        const r = await proceso.enviar(venta, e.cfg, ctx, e.deps);
+        assert.equal(r.estado, 'enviada');
+        assert.doesNotMatch(r.mensaje, /RUT/);
+        assert.equal(campo(L.L200, e.lineasTercero[0][1], 'F200_ID_TIPO_IDENT'), 'N');
+    });
+
+    test('empresa o comprador ya registrado: no consulta la DIAN', async () => {
+        const e = entorno({ tercero: 'no_existe' });
+        const empresa = { ...venta, comprador: { ...venta.comprador, documento: '900123456', tipoDoc: 'N', juridica: true, nombre: 'Empresa SAS' } };
+        await proceso.enviar(empresa, e.cfg, ctx, e.deps);
+        const e2 = entorno();
+        await proceso.enviar(venta, e2.cfg, ctx, e2.deps);
+        assert.ok(![...e.llamadas, ...e2.llamadas].some((l) => l[0] === 'dian'));
+    });
+
+    test('respuesta de la DIAN', () => {
+        const F = 'vistaSelPublicacionesExterna:formSelPublicacionesExterna';
+        assert.deepEqual(dianReal.interpretar(`<td>Raz&oacute;n Social</td><td><span id="${F}:razonSocial">PEREZ  GOMEZ JUAN</span></td>`),
+            { estado: 'con_rut', nombre: 'PEREZ GOMEZ JUAN', mensaje: '' });
+        assert.equal(dianReal.interpretar('Error NIT Inv&aacute;lido.El NIT 999000008 no es v&aacute;lido. Verifique que el NIT se encuentre registrado en el RUT.').estado, 'sin_rut');
+        assert.equal(dianReal.interpretar('<html>En mantenimiento</html>').estado, 'desconocido');
     });
 });

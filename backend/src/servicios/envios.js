@@ -1,13 +1,16 @@
 // ================================================================
 // REPOSITORIO DE ENVÍOS - una fila por venta de ML (llave: # de venta)
 //
-// Estados: enviando | importado | rechazado | error
+// Estados: enviando | importado | rechazado | error | espera_dian
 // Una venta 'importado' nunca se reenvía. 'enviando' funciona como candado:
 // solo un proceso puede reclamar la venta. Si el proceso se interrumpe a mitad
 // (caída del servidor), la venta queda 'enviando': ImportarXML no devuelve el
 // número del pedido, así que reintentar a ciegas podría duplicarlo. Se resuelve
 // consultando el pedido en SIESA (CONSULTA_PEDIDO_ML): si aparece, pasa a
 // 'importado'; si no, un admin la libera.
+//
+// espera_dian: la DIAN no respondió al validar el RUT del comprador. No se escribió nada
+// en SIESA; el reintento automático (reintentosDian) la vuelve a enviar en proximo_intento.
 //
 // pedido_siesa guarda el pedido tal como quedó en SIESA (número y líneas).
 // ================================================================
@@ -16,7 +19,9 @@ const { consulta } = require('./db');
 async function obtener(ventas) {
     if (!ventas.length) return {};
     const { rows } = await consulta(
-        `SELECT venta, estado, detalle, intentos, tercero_creado, actualizado_en
+        `SELECT venta, estado, detalle, intentos, tercero_creado, actualizado_en,
+                espera_desde AS "esperaDesde", proximo_intento AS "proximoIntento",
+                COALESCE((resumen->>'conRut')::boolean, FALSE) AS "conRut"
            FROM envios WHERE venta = ANY($1::text[])`, [ventas]);
     return Object.fromEntries(rows.map((r) => [r.venta, r]));
 }
@@ -29,7 +34,7 @@ async function reclamar(venta, { cargueId, usuarioId }) {
          ON CONFLICT (venta) DO UPDATE
                SET estado = 'enviando', cargue_id = EXCLUDED.cargue_id,
                    enviado_por = EXCLUDED.enviado_por, intentos = envios.intentos + 1
-             WHERE envios.estado IN ('rechazado', 'error')`,
+             WHERE envios.estado IN ('rechazado', 'error', 'espera_dian')`,
         [venta, cargueId, usuarioId]);
     return rowCount === 1;
 }
@@ -40,11 +45,13 @@ async function finalizar(venta, r) {
                 documento_pedido = $5, documento_tercero = COALESCE(NULLIF($6, ''), documento_tercero),
                 respuesta = $7, resumen = $8,
                 pedido_siesa = COALESCE($9::jsonb, pedido_siesa),
-                pedido_consultado_en = CASE WHEN $9::jsonb IS NULL THEN pedido_consultado_en ELSE NOW() END
+                pedido_consultado_en = CASE WHEN $9::jsonb IS NULL THEN pedido_consultado_en ELSE NOW() END,
+                espera_desde = $10, proximo_intento = $11
           WHERE venta = $1`,
         [venta, r.estado, r.detalle, Boolean(r.terceroCreado), r.documentoPedido || '',
             r.documentoTercero || '', r.respuesta || '', JSON.stringify(r.resumen || {}),
-            r.pedidoSiesa ? JSON.stringify(r.pedidoSiesa) : null]);
+            r.pedidoSiesa ? JSON.stringify(r.pedidoSiesa) : null,
+            r.esperaDesde || null, r.proximoIntento || null]);
 }
 
 // Guarda el pedido consultado en SIESA. Si el pedido existe, la venta está en SIESA
@@ -102,9 +109,18 @@ async function historial({ estado, buscar, limite = 200 }) {
     return rows;
 }
 
+// Ventas en espera de la DIAN a las que ya les toca el reintento.
+async function pendientesDian() {
+    const { rows } = await consulta(
+        `SELECT venta, cargue_id, enviado_por FROM envios
+          WHERE estado = 'espera_dian' AND proximo_intento <= NOW()
+          ORDER BY proximo_intento`);
+    return rows;
+}
+
 async function detalle(venta) {
     const { rows } = await consulta('SELECT * FROM envios WHERE venta = $1', [venta]);
     return rows[0] || null;
 }
 
-module.exports = { obtener, reclamar, finalizar, guardarPedido, marcarSinPedido, liberar, historial, detalle };
+module.exports = { obtener, reclamar, finalizar, guardarPedido, marcarSinPedido, liberar, historial, detalle, pendientesDian };

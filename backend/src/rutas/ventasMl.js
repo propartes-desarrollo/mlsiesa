@@ -12,6 +12,7 @@ const AppError = require('../utilidades/AppError');
 const excelMl = require('../servicios/excelMl');
 const parametros = require('../servicios/parametros');
 const municipios = require('../servicios/municipios');
+const dian = require('../servicios/dian');
 const envios = require('../servicios/envios');
 const proceso = require('../servicios/procesoVentas');
 const documentos = require('../servicios/siesa/documentos');
@@ -125,7 +126,7 @@ router.post('/cargues/:id/ventas/:venta/enviar', requiereRol('admin', 'usuario')
             const venta = cargue.ventas.find((v) => v.numero === req.params.venta);
             if (!venta) throw new AppError('La venta no está en este cargue.', 404);
 
-            const resultado = await proceso.enviar(venta, cfg, { cargueId: cargue.id, usuarioId: req.usuario.id }, { repo: envios, soap }, mapa);
+            const resultado = await proceso.enviar(venta, cfg, { cargueId: cargue.id, usuarioId: req.usuario.id }, { repo: envios, soap, dian }, mapa);
             logger.info(`Envío venta ${venta.numero}: ${resultado.estado}`, { pasos: resultado.pasos });
             await auditoria.registrar(req.usuario.id, 'enviar_pedido', 'venta', venta.numero, {
                 cargue: cargue.id, conexion: cfg.siesa.conexion, estado: resultado.estado, mensaje: resultado.mensaje, pasos: resultado.pasos,

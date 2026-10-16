@@ -23,10 +23,10 @@ function PedidoSiesa({ pedido, consultadoEn }) {
     return (
         <Stack gap="xs">
             <Group gap="lg">
-                <div><Text size="xs" c="dimmed">Pedido</Text><Text fw={700} ff="monospace">{pedido.numero}</Text></div>
+                <div><Text size="xs" c="dimmed">Pedido</Text><Text fw={700}>{pedido.numero}</Text></div>
                 <div><Text size="xs" c="dimmed">Fecha</Text><Text>{pedido.fecha}</Text></div>
                 <div><Text size="xs" c="dimmed">Estado en SIESA</Text><Badge variant="light">{pedido.estadoTexto}</Badge></div>
-                <div><Text size="xs" c="dimmed">Cliente</Text><Text size="sm">{pedido.terceroNombre} <Text span ff="monospace" c="dimmed">{pedido.tercero}</Text></Text></div>
+                <div><Text size="xs" c="dimmed">Cliente</Text><Text size="sm">{pedido.terceroNombre} <Text span c="dimmed">{pedido.tercero}</Text></Text></div>
             </Group>
             <Text size="xs" c="dimmed">Notas: {pedido.notas}</Text>
             <Table.ScrollContainer minWidth={700}>
@@ -39,8 +39,8 @@ function PedidoSiesa({ pedido, consultadoEn }) {
                     <Table.Tbody>
                         {pedido.lineas.map((l, i) => (
                             <Table.Tr key={i}>
-                                <Table.Td ff="monospace">{l.item}</Table.Td><Table.Td>{l.descripcion}</Table.Td>
-                                <Table.Td ff="monospace">{l.bodega}</Table.Td><Table.Td ta="right">{l.cantidad}</Table.Td>
+                                <Table.Td>{l.item}</Table.Td><Table.Td>{l.descripcion}</Table.Td>
+                                <Table.Td>{l.bodega}</Table.Td><Table.Td ta="right">{l.cantidad}</Table.Td>
                                 <Table.Td ta="right" style={SIN_CORTE}>{pesos(l.precioUnitario)}</Table.Td><Table.Td ta="right" style={SIN_CORTE}>{pesos(l.vlrImp)}</Table.Td>
                                 <Table.Td ta="right" style={SIN_CORTE}>{pesos(l.vlrNeto)}</Table.Td>
                             </Table.Tr>
@@ -134,12 +134,13 @@ export default function Historial() {
                                 const est = ESTADOS_BD[f.estado] || { color: 'gray', texto: f.estado };
                                 return (
                                     <Table.Tr key={f.venta} style={{ cursor: 'pointer' }} onClick={() => abrir(f.venta)}>
-                                        <Table.Td ff="monospace" fz="sm">{f.venta}</Table.Td>
-                                        <Table.Td ff="monospace" fz="sm" fw={700} style={{ whiteSpace: 'nowrap' }}>{f.pedido_numero || <Text span c="dimmed" size="sm">-</Text>}</Table.Td>
-                                        <Table.Td><Badge variant="light" color={est.color}>{est.texto}</Badge>
-                                            {f.tercero_creado && <Badge ml={4} variant="outline" size="xs">cliente nuevo</Badge>}</Table.Td>
+                                        <Table.Td fz="sm">{f.venta}</Table.Td>
+                                        <Table.Td fz="sm" fw={700} style={{ whiteSpace: 'nowrap' }}>{f.pedido_numero || <Text span c="dimmed" size="sm">-</Text>}</Table.Td>
+                                        <Table.Td><Badge variant="light" color={est.color}>{est.texto}</Badge></Table.Td>
                                         <Table.Td fz="sm" maw={340}>{f.detalle}</Table.Td>
-                                        <Table.Td fz="sm">{f.resumen?.comprador}<Text size="xs" c="dimmed" ff="monospace">{f.resumen?.documento}</Text></Table.Td>
+                                        <Table.Td fz="sm">{f.resumen?.comprador}
+                                            <Text size="xs" c="dimmed">{f.resumen?.documento}</Text>
+                                            {f.tercero_creado && <Badge mt={2} variant="outline" color="teal" size="xs">{f.resumen?.conRut ? 'cliente nuevo - NIT' : 'cliente nuevo'}</Badge>}</Table.Td>
                                         <Table.Td ta="right" fz="sm" style={{ whiteSpace: 'nowrap' }}>{f.resumen?.totalMl ? pesos(f.resumen.totalMl) : ''}</Table.Td>
                                         <Table.Td fz="sm">{f.enviado_por}</Table.Td>
                                         <Table.Td ta="right" fz="sm">{f.intentos}</Table.Td>
@@ -157,6 +158,7 @@ export default function Historial() {
                     <Stack>
                         <Group justify="space-between">
                             <Group><Badge variant="light" color={ESTADOS_BD[detalle.estado]?.color}>{ESTADOS_BD[detalle.estado]?.texto}</Badge>
+                                {detalle.tercero_creado && <Badge variant="outline" color="teal">{detalle.resumen?.conRut ? 'Cliente nuevo - NIT (tiene RUT)' : 'Cliente nuevo'}</Badge>}
                                 <Text size="sm">{detalle.detalle}</Text></Group>
                             <Button size="xs" variant="light" leftSection={<RefreshCw size={14} />} loading={consultando}
                                 onClick={() => consultarSiesa(detalle.venta)}>Consultar en SIESA</Button>

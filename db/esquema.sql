@@ -77,12 +77,13 @@ CREATE INDEX IF NOT EXISTS idx_cargues_creado_en ON cargues(creado_en DESC);
 
 -- ---------------------------------------------------------------
 -- envios: una fila por venta de ML (llave natural: # de venta).
---   enviando | importado | rechazado | error
+--   enviando | importado | rechazado | error | espera_dian
 -- Una venta 'importado' nunca se reenvía; 'enviando' es el candado.
+-- espera_dian: la DIAN no respondió al validar el RUT; se reintenta sola.
 -- ---------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS envios (
   venta             VARCHAR(30) PRIMARY KEY,
-  estado            VARCHAR(20) NOT NULL CHECK (estado IN ('enviando', 'importado', 'rechazado', 'error')),
+  estado            VARCHAR(20) NOT NULL CHECK (estado IN ('enviando', 'importado', 'rechazado', 'error', 'espera_dian')),
   detalle           TEXT,
   tercero_creado    BOOLEAN NOT NULL DEFAULT FALSE,
   documento_pedido  TEXT,          -- XML enviado, con la clave enmascarada
@@ -92,6 +93,8 @@ CREATE TABLE IF NOT EXISTS envios (
   pedido_siesa      JSONB,         -- el pedido como quedó en SIESA (número y líneas)
   pedido_consultado_en TIMESTAMPTZ,
   intentos          INTEGER NOT NULL DEFAULT 0,
+  espera_desde      TIMESTAMPTZ,   -- primera vez que la DIAN no respondió
+  proximo_intento   TIMESTAMPTZ,   -- cuándo se reintenta sola (estado espera_dian)
   cargue_id         UUID REFERENCES cargues(id),
   enviado_por       UUID REFERENCES usuarios(id),
   creado_en         TIMESTAMPTZ DEFAULT NOW(),
@@ -99,6 +102,7 @@ CREATE TABLE IF NOT EXISTS envios (
 );
 CREATE INDEX IF NOT EXISTS idx_envios_estado ON envios(estado);
 CREATE INDEX IF NOT EXISTS idx_envios_actualizado ON envios(actualizado_en DESC);
+CREATE INDEX IF NOT EXISTS idx_envios_proximo_intento ON envios(proximo_intento) WHERE estado = 'espera_dian';
 
 DROP TRIGGER IF EXISTS trg_envios_actualizado ON envios;
 CREATE TRIGGER trg_envios_actualizado BEFORE UPDATE ON envios

@@ -10,7 +10,28 @@ const { totalIva, bloqueoFormaEntrega } = require('./excelMl');
 // el que se calcula ahora.
 const BLOQUEO_ENTREGA_GUARDADO = /^(La forma de entrega "|Venta con entrega ")/;
 
-const ESTADO_UI = { importado: 'enviada', rechazado: 'rechazada', error: 'con_error', enviando: 'en_proceso' };
+const ESTADO_UI = { importado: 'enviada', rechazado: 'rechazada', error: 'con_error', enviando: 'en_proceso', espera_dian: 'en_espera' };
+
+const MINUTO = 60 * 1000;
+const hora = (d) => d.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Bogota' });
+
+// Persona natural con cédula: si tiene RUT en la DIAN se registra con NIT (tipo N), sigue
+// siendo persona natural. Devuelve { venta, espera, aviso }: espera = la DIAN no respondió
+// y aún no se cumple la espera máxima (la venta se reintenta sola); aviso = se cumplió y se
+// registra con cédula.
+async function validarRut(venta, cfg, dian, pasos, esperaDesde, ahora) {
+    const c = venta.comprador;
+    if (!cfg.envio.validar_rut || !dian || c.juridica || (c.tipoDoc || 'C') !== 'C') return { venta };
+    const rut = await dian.consultarRut(c.documento);
+    pasos.push(`DIAN ${c.documento}: ${rut.estado}${rut.nombre ? ` (${rut.nombre})` : ''}${rut.mensaje ? ` (${rut.mensaje})` : ''}`);
+    if (rut.estado === 'con_rut') return { venta: { ...venta, comprador: { ...c, tipoDoc: 'N' } } };
+    if (rut.estado === 'sin_rut') return { venta };
+    const desde = esperaDesde ? new Date(esperaDesde) : ahora;
+    if (ahora - desde < Number(cfg.envio.rut_espera_max_min) * MINUTO) {
+        return { venta, espera: { desde, proximo: new Date(ahora.getTime() + Number(cfg.envio.rut_reintento_min) * MINUTO) } };
+    }
+    return { venta, aviso: 'La DIAN no respondió y no se pudo validar si el comprador tiene RUT: se registró con cédula. Revise en la DIAN si tiene RUT y, si lo tiene, actualice el cliente en SIESA.' };
+}
 
 function vistaPrevia(venta, cfg, previo = null, municipios = {}) {
     const alertas = [...venta.alertas];
@@ -94,7 +115,8 @@ async function resolverCcostos(venta, cfg, soap, pasos) {
 }
 
 // Envía una venta. Nunca lanza por errores de SIESA: devuelve { estado, mensaje, pasos }.
-async function enviar(venta, cfg, ctx, { repo, soap }, municipios = {}) {
+// deps.dian: consulta del RUT (opcional). deps.ahora: reloj, para las pruebas.
+async function enviar(venta, cfg, ctx, { repo, soap, dian, ahora = () => new Date() }, municipios = {}) {
     const pv = vistaPrevia(venta, cfg, null, municipios);
     if (pv.bloqueos.length) return { estado: 'bloqueada', mensaje: pv.bloqueos.join(' '), pasos: [] };
 
@@ -105,6 +127,7 @@ async function enviar(venta, cfg, ctx, { repo, soap }, municipios = {}) {
             : { estado: 'en_proceso', mensaje: 'Otra persona está enviando esta venta en este momento.', pasos: [] };
     }
 
+    const esperaDesde = (await repo.obtener([venta.numero]))[venta.numero]?.esperaDesde || null;
     const pasos = [];
     let lineasPedido = documentos.pedidoLineas(venta, cfg);
     const registro = {
@@ -116,9 +139,17 @@ async function enviar(venta, cfg, ctx, { repo, soap }, municipios = {}) {
             totalMl: pv.totalMl, items: venta.items.length,
         },
     };
+    let aviso = '';
     const terminar = async (estado, detalle, respuesta = '') => {
+        if (aviso && estado !== 'espera_dian') {
+            detalle = `${detalle} ${aviso}`;
+            registro.resumen.aviso = aviso;
+        }
         await repo.finalizar(venta.numero, { ...registro, estado, detalle, respuesta });
-        return { estado: ESTADO_UI[estado], mensaje: detalle, pasos };
+        return {
+            estado: ESTADO_UI[estado], mensaje: detalle, pasos,
+            terceroCreado: registro.terceroCreado, conRut: Boolean(registro.resumen.conRut),
+        };
     };
 
     try {
@@ -144,7 +175,14 @@ async function enviar(venta, cfg, ctx, { repo, soap }, municipios = {}) {
                 if (!cfg.envio.crear_tercero) {
                     return terminar('error', 'El comprador no está registrado en SIESA. Regístrelo en SIESA (o pida a un administrador que active el registro de compradores nuevos) y vuelva a enviar.');
                 }
-                const lineasTercero = documentos.terceroLineas(venta, cfg, t.tercero, municipios, segmentos);
+                const rut = await validarRut(venta, cfg, dian, pasos, esperaDesde, ahora());
+                if (rut.espera) {
+                    Object.assign(registro, { esperaDesde: rut.espera.desde, proximoIntento: rut.espera.proximo });
+                    return terminar('espera_dian', `La DIAN no respondió para validar el RUT del comprador. La venta se enviará sola a las ${hora(rut.espera.proximo)}.`);
+                }
+                aviso = rut.aviso || '';
+                if (rut.venta.comprador.tipoDoc === 'N') registro.resumen.conRut = true;
+                const lineasTercero = documentos.terceroLineas(rut.venta, cfg, t.tercero, municipios, segmentos);
                 const clasif = documentos.clasificacionCliente(venta, cfg.tercero, segmentos);
                 pasos.push(`Clasificación: ${clasif.filter(([p]) => p === 'D01' || p === 'D02').map((c) => c.join(' ')).join(', ')}`);
                 registro.documentoTercero = soap.documento(lineasTercero, cfg.siesa, true);
@@ -183,4 +221,4 @@ async function enviar(venta, cfg, ctx, { repo, soap }, municipios = {}) {
     }
 }
 
-module.exports = { vistaPrevia, enviar, ESTADO_UI };
+module.exports = { vistaPrevia, enviar, ESTADO_UI, validarRut };

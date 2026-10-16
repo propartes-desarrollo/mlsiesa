@@ -42,6 +42,10 @@ app.use((req, res, next) => next(new AppError(`No se encontró la ruta: ${req.or
 app.use(manejadorErrores);
 
 // En pruebas se importa la app sin abrir el puerto.
-if (require.main === module) app.listen(PUERTO, () => logger.info(`Servidor mlsiesa corriendo en el puerto ${PUERTO} (${process.env.ENTORNO || 'development'})`));
+if (require.main === module) {
+    app.listen(PUERTO, () => logger.info(`Servidor mlsiesa corriendo en el puerto ${PUERTO} (${process.env.ENTORNO || 'development'})`));
+    // Ventas en espera de la DIAN: se reenvían solas.
+    require('./servicios/reintentosDian').iniciar();
+}
 
 module.exports = app;

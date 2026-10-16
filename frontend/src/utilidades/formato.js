@@ -15,6 +15,7 @@ export const ESTADOS = {
     rechazada: { color: 'red', texto: 'Rechazada' },
     con_error: { color: 'orange', texto: 'Con error' },
     en_proceso: { color: 'grape', texto: 'Verificar' },
+    en_espera: { color: 'cyan', texto: 'Esperando DIAN' },
     enviando: { color: 'gray', texto: 'Enviando' },
 };
 
@@ -24,7 +25,9 @@ export const ESTADOS_BD = {
     rechazado: ESTADOS.rechazada,
     error: ESTADOS.con_error,
     enviando: ESTADOS.en_proceso,
+    espera_dian: ESTADOS.en_espera,
 };
 
-// Se puede (re)enviar: lista, o un intento anterior que falló sin llegar a SIESA.
-export const enviable = (estado) => ['lista', 'rechazada', 'con_error'].includes(estado);
+// Se puede (re)enviar: lista, un intento anterior que falló sin llegar a SIESA, o una
+// venta esperando a la DIAN (enviarla de nuevo adelanta el reintento automático).
+export const enviable = (estado) => ['lista', 'rechazada', 'con_error', 'en_espera'].includes(estado);

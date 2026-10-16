@@ -21,9 +21,10 @@ function Resumen({ ventas }) {
         [`Listas (${conAvisos} con avisos)`, cuenta('lista'), 'green'],
         ['Bloqueadas o rechazadas', cuenta('bloqueada', 'rechazada', 'con_error'), 'red'],
         ['Enviadas a SIESA', cuenta('enviada'), 'blue'],
-    ];
+        ['Esperando la DIAN', cuenta('en_espera'), 'cyan'],
+    ].filter(([t, n]) => n > 0 || t !== 'Esperando la DIAN');
     return (
-        <SimpleGrid cols={{ base: 2, sm: 4 }}>
+        <SimpleGrid cols={{ base: 2, sm: datos.length }}>
             {datos.map(([t, n, c]) => (
                 <Paper key={t} withBorder radius="md" p="sm">
                     <Text fz={22} fw={700} c={c}>{n}</Text>
@@ -38,8 +39,21 @@ const LOGISTICA = { full: 'Full', colecta: 'Colecta' };
 
 const TIPO_DOC = { C: 'CC', E: 'CE', N: 'NIT', P: 'Pasaporte' };
 
-// Tipo de envío y bodega, p. ej. "Colecta · BP150".
-const envioBodega = (v) => (v.logistica ? `${LOGISTICA[v.logistica]} · ${v.bodega}` : '-');
+// Tipo de envío y bodega, p. ej. "Colecta - BP150".
+const envioBodega = (v) => (v.logistica ? `${LOGISTICA[v.logistica]} - ${v.bodega}` : '-');
+
+// Cliente creado en SIESA por este envío (o por uno anterior de la misma venta).
+const clienteNuevo = (v) => Boolean(v.resultado ? v.resultado.terceroCreado : v.previo?.tercero_creado);
+const conRut = (v) => Boolean(v.resultado ? v.resultado.conRut : v.previo?.conRut);
+
+function BadgeCliente({ v }) {
+    if (!clienteNuevo(v)) return null;
+    return (
+        <Tooltip label={conRut(v) ? 'El comprador se registró en SIESA con este envío, con NIT porque tiene RUT en la DIAN' : 'El comprador se registró en SIESA con este envío'}>
+            <Badge variant="outline" color="teal" style={{ flexShrink: 0 }}>{conRut(v) ? 'Cliente nuevo - NIT' : 'Cliente nuevo'}</Badge>
+        </Tooltip>
+    );
+}
 
 function Detalle({ v, esAdmin, alVerDocumento }) {
     const t = v.tercero;
@@ -48,8 +62,9 @@ function Detalle({ v, esAdmin, alVerDocumento }) {
             {v.bloqueos.length > 0 && <Alert color="red" icon={<Ban size={16} />} p="xs"><List size="sm">{v.bloqueos.map((b) => <List.Item key={b}>{b}</List.Item>)}</List></Alert>}
             {v.alertas.length > 0 && <Alert color="yellow" icon={<AlertTriangle size={16} />} p="xs"><List size="sm">{v.alertas.map((a) => <List.Item key={a}>{a}</List.Item>)}</List></Alert>}
             {v.resultado && <Alert color={ESTADOS[v.estado]?.color || 'gray'} p="xs"><Text size="sm">{v.resultado.mensaje}</Text>
-                {esAdmin && v.resultado.pasos?.length > 0 && <Text size="xs" c="dimmed">{v.resultado.pasos.join(' · ')}</Text>}</Alert>}
-            {!v.resultado && v.previo && <Text size="xs" c="dimmed">Último envío: {v.previo.detalle} · {fechaHora(v.previo.actualizado_en)}</Text>}
+                {v.resultado.terceroCreado && <Text size="sm" fw={500}>Se registró el comprador como cliente nuevo en SIESA{v.resultado.conRut ? ', con NIT (tiene RUT en la DIAN)' : ''}.</Text>}
+                {esAdmin && v.resultado.pasos?.length > 0 && <Text size="xs" c="dimmed">{v.resultado.pasos.join(' - ')}</Text>}</Alert>}
+            {!v.resultado && v.previo && <Text size="xs" c="dimmed">Último envío: {v.previo.detalle} - {fechaHora(v.previo.actualizado_en)}</Text>}
 
             <Table withTableBorder verticalSpacing={4} fz="sm">
                 <Table.Thead><Table.Tr>
@@ -58,14 +73,14 @@ function Detalle({ v, esAdmin, alVerDocumento }) {
                 </Table.Tr></Table.Thead>
                 <Table.Tbody>{v.lineas.map((l, i) => (
                     <Table.Tr key={i}>
-                        <Table.Td ff="monospace">{l.referencia}</Table.Td><Table.Td>{l.descripcion}</Table.Td>
+                        <Table.Td>{l.referencia}</Table.Td><Table.Td>{l.descripcion}</Table.Td>
                         <Table.Td ta="right">{l.cantidad}</Table.Td><Table.Td ta="right">{pesos(l.precioIva)}</Table.Td>
                         <Table.Td ta="right">{pesos(l.precioNeto)}</Table.Td><Table.Td style={{ whiteSpace: 'nowrap' }}>{envioBodega(v)}</Table.Td>
                     </Table.Tr>))}
                 </Table.Tbody>
             </Table>
             <Text size="xs" c="dimmed">
-                Cobrado en Mercado Libre {pesos(v.totalMl)} · total sin IVA {pesos(v.totalNeto)} · total con IVA en SIESA aprox. {pesos(v.totalSiesaAprox)}
+                Cobrado en Mercado Libre {pesos(v.totalMl)} - total sin IVA {pesos(v.totalNeto)} - total con IVA en SIESA aprox. {pesos(v.totalSiesaAprox)}
             </Text>
             <Text size="xs" c="dimmed">Notas del pedido: {v.notas}</Text>
 
@@ -73,17 +88,17 @@ function Detalle({ v, esAdmin, alVerDocumento }) {
                 <div>
                     <Text size="sm" fw={700}>Facturar a:</Text>
                     {t ? (<>
-                        <Text size="sm">{t.tipo === '2' ? 'Empresa' : 'Persona natural'} · {TIPO_DOC[t.tipoIdent] || t.tipoIdent} {t.documento}</Text>
+                        <Text size="sm">{t.tipo === '2' ? 'Empresa' : 'Persona natural'} - {TIPO_DOC[t.tipoIdent] || t.tipoIdent} {t.documento}</Text>
                         {t.tipo === '2'
                             ? <Text size="sm">{t.razonSocial}</Text>
-                            : <Text size="sm">Nombres: <b>{t.nombres}</b> · Apellidos: <b>{t.apellido1} {t.apellido2}</b></Text>}
-                        <Text size="xs" c="dimmed">{t.direccion}{t.depto ? '' : ' · ciudad no registrada'}</Text>
+                            : <Text size="sm">Nombres: <b>{t.nombres}</b> - Apellidos: <b>{t.apellido1} {t.apellido2}</b></Text>}
+                        <Text size="xs" c="dimmed">{t.direccion}{t.depto ? '' : ' - ciudad no registrada'}</Text>
                     </>) : <Text size="sm" c="dimmed">Sin documento</Text>}
                 </div>
                 <div>
                     <Text size="sm" fw={700}>Dirección de Envío</Text>
                     <Text size="sm">{v.comprador.direccionEnvio}</Text>
-                    <Text size="xs" c="dimmed">{v.comprador.ciudad}, {v.comprador.depto} · Guía {v.seguimiento || '-'} · Estado en Mercado Libre: {v.estadoMl}</Text>
+                    <Text size="xs" c="dimmed">{v.comprador.ciudad}, {v.comprador.depto} - Guía {v.seguimiento || 'sin número'} - Estado en Mercado Libre: {v.estadoMl}</Text>
                     <Text size="sm" mt={4}>Tipo de envío: <b>{v.logistica ? LOGISTICA[v.logistica] : '-'}</b></Text>
                 </div>
             </SimpleGrid>
@@ -134,7 +149,7 @@ export default function Cargue() {
     const enviables = visibles.filter((v) => enviable(v.estado));
 
     async function verDocumento(venta, tipo) {
-        const titulo = `Archivo técnico del ${tipo === 'tercero' ? 'cliente' : 'pedido'} · venta ${venta}`;
+        const titulo = `Archivo técnico del ${tipo === 'tercero' ? 'cliente' : 'pedido'} - venta ${venta}`;
         setDocumento({ titulo, texto: null });
         try {
             const { data } = await ventasMl.documento(id, venta, tipo);
@@ -152,7 +167,7 @@ export default function Cargue() {
             actualizar(v.venta, { estado: 'enviando' });
             try {
                 const { data } = await ventasMl.enviar(id, v.venta);
-                actualizar(v.venta, { estado: data.estado, resultado: { mensaje: data.mensaje, pasos: data.pasos } });
+                actualizar(v.venta, { estado: data.estado, resultado: { mensaje: data.mensaje, pasos: data.pasos, terceroCreado: data.terceroCreado, conRut: data.conRut } });
                 if (data.estado === 'enviada') ok += 1;
             } catch (e) {
                 actualizar(v.venta, { estado: 'con_error', resultado: { mensaje: mensajeError(e), pasos: [] } });
@@ -186,7 +201,7 @@ export default function Cargue() {
             )}
             {datos.ciudadesSinCodigo.length > 0 && (
                 <Alert color="yellow" icon={<AlertTriangle size={18} />}>
-                    Hay ciudades que la app no reconoce: {datos.ciudadesSinCodigo.join(' · ')}. Si el comprador es nuevo, quedaría en SIESA sin ciudad.
+                    Hay ciudades que la app no reconoce: {datos.ciudadesSinCodigo.join(' - ')}. Si el comprador es nuevo, quedaría en SIESA sin ciudad.
                     {esAdmin ? ' Agréguelas en Configuración → Municipios.' : ' Avise al administrador para que las agregue.'}
                 </Alert>
             )}
@@ -225,9 +240,9 @@ export default function Cargue() {
                                                     checked={seleccion.has(v.venta)} onChange={() => alternar(seleccion, setSeleccion, v.venta)} />}
                                             </Table.Td>
                                             <Table.Td><ActionIcon variant="subtle" size="sm" aria-label="Detalle">{abierta ? <ChevronDown size={16} /> : <ChevronRight size={16} />}</ActionIcon></Table.Td>
-                                            <Table.Td ff="monospace" fz="sm">{v.venta}</Table.Td>
+                                            <Table.Td fz="sm">{v.venta}</Table.Td>
                                             <Table.Td fz="sm" c="dimmed" style={{ whiteSpace: 'nowrap' }}>{fechaHora(v.fecha)}</Table.Td>
-                                            <Table.Td fz="sm">{v.comprador.nombre}<Text size="xs" c="dimmed" ff="monospace">{TIPO_DOC[v.comprador.tipoDoc] || v.comprador.tipoDoc} {v.comprador.documento}</Text></Table.Td>
+                                            <Table.Td fz="sm">{v.comprador.nombre}<Text size="xs" c="dimmed">{TIPO_DOC[v.comprador.tipoDoc] || v.comprador.tipoDoc} {v.comprador.documento}</Text></Table.Td>
                                             <Table.Td fz="sm">
                                                 {v.lineas.filter((l) => !l.esFlete).map((l) => `${l.referencia} x${l.cantidad}`).join(', ')}
                                                 {v.lineas.some((l) => l.esFlete) && <Badge ml={6} size="xs" variant="light" color="gray">+ flete</Badge>}
@@ -238,6 +253,7 @@ export default function Cargue() {
                                                     <Tooltip label={v.resultado?.mensaje || v.previo?.detalle || est.texto} disabled={!v.resultado && !v.previo}>
                                                         <Badge variant="light" color={est.color} style={{ flexShrink: 0 }} leftSection={v.estado === 'enviando' ? <Loader size={10} /> : null}>{est.texto}</Badge>
                                                     </Tooltip>
+                                                    <BadgeCliente v={v} />
                                                     {v.alertas.length > 0 && (
                                                         <Tooltip label={v.alertas.join(' / ')} multiline w={320}>
                                                             <Badge variant="outline" color="yellow">{v.alertas.length} aviso{v.alertas.length > 1 ? 's' : ''}</Badge>

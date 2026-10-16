@@ -8,6 +8,8 @@ export const tema = createTheme({
     primaryShade: 6,
     defaultRadius: 'md',
     fontFamily: "'Inter', sans-serif",
+    // Inter en toda la app, también en códigos y archivos técnicos (sin monoespaciada).
+    fontFamilyMonospace: "'Inter', sans-serif",
     headings: { fontFamily: "'Inter', sans-serif", fontWeight: '700' },
     colors: {
         marca: [

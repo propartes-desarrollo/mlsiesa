@@ -39,7 +39,7 @@ async function main() {
         console.error('Falta SIESA_CLAVE en backend/.env');
         process.exit(1);
     }
-    console.log(`Conexión: ${cfg.siesa.conexion} · usuario ${cfg.siesa.usuario}`);
+    console.log(`Conexión: ${cfg.siesa.conexion} - usuario ${cfg.siesa.usuario}`);
     const escribe = bandera === '--importar' || (bandera === '--crear-tercero' && enviarTercero);
     if (escribe && cfg.siesa.conexion !== 'Pruebas') throw new Error('Este script solo escribe en la conexión Pruebas.');
 
@@ -87,7 +87,7 @@ async function mostrarPedido(venta, cfg) {
     const r = await soap.consultarPedido(documentos.referenciaMl(venta), cfg.siesa);
     if (r.estado !== 'encontrado') { console.log(`Pedido de la venta ${venta}: ${r.estado} ${r.mensaje}`); return; }
     for (const p of r.pedidos) {
-        console.log(`Pedido ${p.numero} (CO ${p.co}) · ${p.fecha} · ${p.estadoTexto} · cliente ${p.tercero} ${p.terceroNombre}`);
+        console.log(`Pedido ${p.numero} (CO ${p.co}) - ${p.fecha} - ${p.estadoTexto} - cliente ${p.tercero} ${p.terceroNombre}`);
         console.log(`  Notas: ${p.notas}`);
         for (const l of p.lineas) console.log(`  ${l.item.padEnd(14)} ${l.bodega.padEnd(6)} ${String(l.cantidad).padStart(4)} x ${l.precioUnitario}  IVA ${l.vlrImp}  total ${l.vlrNeto}`);
         console.log(`  Total ${p.totalNeto} (IVA ${p.totalImp})`);
@@ -106,8 +106,8 @@ async function crearTercero(ventas, numero, doc, { enviar, empresa }, cfg) {
             : { ...v.comprador, documento: doc, tipoDoc: 'C', juridica: false, nombre: 'Prueba Mlsiesa Tercero Ficticio' },
     };
     const d = documentos.datosTercero(prueba, cfg);
-    console.log(`Tercero de prueba ${doc} (DV ${d.dv}, ${empresa ? 'empresa' : 'persona natural'}): razón social "${d.razonSocial || ''}" · nombres "${d.nombres}" · apellidos "${d.apellido1}" "${d.apellido2}"`);
-    console.log(`  Dirección "${d.direccion}" · ciudad ${d.depto}-${d.ciudad} · email "${d.email}" · teléfono "${d.telefono}"`);
+    console.log(`Tercero de prueba ${doc} (DV ${d.dv}, ${empresa ? 'empresa' : 'persona natural'}): razón social "${d.razonSocial || ''}" - nombres "${d.nombres}" - apellidos "${d.apellido1}" "${d.apellido2}"`);
+    console.log(`  Dirección "${d.direccion}" - ciudad ${d.depto}-${d.ciudad} - email "${d.email}" - teléfono "${d.telefono}"`);
     const lineas = documentos.terceroLineas(prueba, cfg);
     const errores = documentos.verificarLargos(lineas);
     if (errores.length) throw new Error(errores.join(' '));

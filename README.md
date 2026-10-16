@@ -168,6 +168,26 @@ Si el comprador no existe en SIESA, la app lo crea en un solo documento, antes d
 Probado en Pruebas el 2026-10-06 con terceros ficticios (`999000001` a `999000003`,
 "Prueba Mlsiesa Tercero Ficticio"): importa y queda como cliente activo.
 
+### RUT de la persona natural (DIAN)
+
+Antes de registrar a un comprador persona natural con cédula, la app consulta en la DIAN
+si tiene RUT (`servicios/dian.js`), con la cédula y su dígito de verificación (módulo 11).
+Usa la página pública "Consulta de Inconsistencias" de MUISCA, que no tiene captcha:
+
+| Respuesta de la DIAN | Cómo se registra |
+|---|---|
+| Tiene RUT (muestra el nombre) | Tipo de identificación `N` (NIT) con su dígito, **persona natural** |
+| No está en el RUT | Cédula (`C`), como antes |
+| No responde o la página cambió | La venta queda **Esperando DIAN** (nada se escribe en SIESA) y se reenvía sola cada `envio.rut_reintento_min` (10) minutos. Pasados `envio.rut_espera_max_min` (60), se registra con cédula y el envío queda con un aviso para revisarlo |
+
+El reintento corre en el backend cada minuto (`servicios/reintentosDian.js`), a nombre
+de quien envió la venta. Las empresas y los compradores que ya están en SIESA no se
+consultan. Se apaga con `envio.validar_rut`. La migración
+`db/migraciones/0003_espera_dian.sql` agrega el estado `espera_dian`.
+
+No es un servicio de la DIAN para sistemas: si cambian la página, la consulta da "no
+responde" y aplica la espera de arriba hasta ajustarla.
+
 ## Pendientes antes de enviar pedidos reales
 
 Hay que cerrarlos con TI y contabilidad. Ninguno bloquea la revisión de las ventas.
