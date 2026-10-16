@@ -3,62 +3,132 @@
 // ================================================================
 import { useEffect, useState } from 'react';
 import {
-    Stack, Title, Text, Paper, Group, Table, Badge, TextInput, Select, Modal, Code, ScrollArea,
-    Button, Alert, Tabs, Loader, Center,
+    Stack, Title, Text, Paper, Group, Table, Badge, TextInput, Select, Modal, Code, ScrollArea, Tooltip,
+    Button, Alert, Tabs, Loader, Center, Grid, Accordion,
 } from '@mantine/core';
 import { useDebouncedValue } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { Search, AlertTriangle, RefreshCw } from 'lucide-react';
 import { envios, mensajeError } from '../api/indice';
+import { useOutletContext } from 'react-router-dom';
 import { useAuth } from '../contexto/ContextoAuth';
-import { pesos, fechaHora, ESTADOS_BD } from '../utilidades/formato';
+import { pesos, fechaHora, ESTADOS_BD, detalleCorto, conDv } from '../utilidades/formato';
 
 const SIN_CORTE = { whiteSpace: 'nowrap' };
 
-// El pedido tal como quedó en SIESA (CONSULTA_PEDIDO_ML).
-function PedidoSiesa({ pedido, consultadoEn }) {
-    if (!pedido) {
-        return <Text size="sm" c="dimmed">Todavía no se tiene el detalle del pedido. Use "Consultar en SIESA".</Text>;
-    }
+// Dato del resumen: etiqueta pequeña arriba, valor abajo. Separados por una línea vertical.
+function Dato({ etiqueta, span, primero, children }) {
     return (
-        <Stack gap="xs">
-            <Group gap="lg">
-                <div><Text size="xs" c="dimmed">Pedido</Text><Text fw={700}>{pedido.numero}</Text></div>
-                <div><Text size="xs" c="dimmed">Fecha</Text><Text>{pedido.fecha}</Text></div>
-                <div><Text size="xs" c="dimmed">Estado en SIESA</Text><Badge variant="light">{pedido.estadoTexto}</Badge></div>
-                <div><Text size="xs" c="dimmed">Cliente</Text><Text size="sm">{pedido.terceroNombre} <Text span c="dimmed">{pedido.tercero}</Text></Text></div>
-            </Group>
-            <Text size="xs" c="dimmed">Notas: {pedido.notas}</Text>
-            <Table.ScrollContainer minWidth={700}>
-                <Table withTableBorder verticalSpacing={4} fz="sm">
+        <Grid.Col span={span} px="md" py={4}
+            style={primero ? undefined : { borderLeft: '1px solid var(--mantine-color-gray-3)' }}>
+            <Text size="xs" c="dimmed" mb={4}>{etiqueta}</Text>
+            {children}
+        </Grid.Col>
+    );
+}
+
+// Productos del pedido tal como quedó en SIESA (CONSULTA_PEDIDO_ML).
+function LineasPedido({ pedido }) {
+    return (
+        <Paper withBorder radius="md">
+            <Table.ScrollContainer minWidth={640}>
+                <Table verticalSpacing="xs" fz="sm">
                     <Table.Thead><Table.Tr>
-                        <Table.Th>Ítem</Table.Th><Table.Th>Descripción</Table.Th><Table.Th>Bodega</Table.Th>
-                        <Table.Th ta="right">Cant.</Table.Th><Table.Th ta="right">Precio unit.</Table.Th>
-                        <Table.Th ta="right">IVA</Table.Th><Table.Th ta="right">Total</Table.Th>
+                        <Table.Th>Producto</Table.Th><Table.Th>Bodega</Table.Th><Table.Th ta="right">Cant.</Table.Th>
+                        <Table.Th ta="right">Precio unit.</Table.Th><Table.Th ta="right">IVA</Table.Th><Table.Th ta="right">Total</Table.Th>
                     </Table.Tr></Table.Thead>
                     <Table.Tbody>
                         {pedido.lineas.map((l, i) => (
                             <Table.Tr key={i}>
-                                <Table.Td>{l.item}</Table.Td><Table.Td>{l.descripcion}</Table.Td>
+                                <Table.Td><Text size="sm" fw={500}>{l.item}</Text><Text size="xs" c="dimmed">{l.descripcion}</Text></Table.Td>
                                 <Table.Td>{l.bodega}</Table.Td><Table.Td ta="right">{l.cantidad}</Table.Td>
-                                <Table.Td ta="right" style={SIN_CORTE}>{pesos(l.precioUnitario)}</Table.Td><Table.Td ta="right" style={SIN_CORTE}>{pesos(l.vlrImp)}</Table.Td>
+                                <Table.Td ta="right" style={SIN_CORTE}>{pesos(l.precioUnitario)}</Table.Td>
+                                <Table.Td ta="right" style={SIN_CORTE}>{pesos(l.vlrImp)}</Table.Td>
                                 <Table.Td ta="right" style={SIN_CORTE}>{pesos(l.vlrNeto)}</Table.Td>
                             </Table.Tr>
                         ))}
-                        <Table.Tr fw={700}>
-                            <Table.Td colSpan={5} ta="right">Total del pedido</Table.Td>
-                            <Table.Td ta="right" style={SIN_CORTE}>{pesos(pedido.totalImp)}</Table.Td><Table.Td ta="right" style={SIN_CORTE}>{pesos(pedido.totalNeto)}</Table.Td>
-                        </Table.Tr>
                     </Table.Tbody>
+                    <Table.Tfoot><Table.Tr>
+                        <Table.Th colSpan={4} ta="right">Total del pedido</Table.Th>
+                        <Table.Th ta="right" style={SIN_CORTE}>{pesos(pedido.totalImp)}</Table.Th>
+                        <Table.Th ta="right" style={SIN_CORTE}>{pesos(pedido.totalNeto)}</Table.Th>
+                    </Table.Tr></Table.Tfoot>
                 </Table>
             </Table.ScrollContainer>
-            {consultadoEn && <Text size="xs" c="dimmed">Consultado en SIESA: {fechaHora(consultadoEn)}</Text>}
+        </Paper>
+    );
+}
+
+// Detalle de un envío: resultado, resumen, productos y, si aplica, información técnica.
+function DetalleEnvio({ d, fila, tecnico, esAdmin, consultando, alConsultar, alLiberar }) {
+    const est = ESTADOS_BD[d.estado] || { color: 'gray', texto: d.estado };
+    const pedido = d.pedido_siesa;
+    const r = d.resumen || {};
+    return (
+        <Stack gap="md">
+            <Group justify="space-between" align="flex-start">
+                <Group gap="xs">
+                    <Badge size="lg" variant="light" color={est.color}>{est.texto}</Badge>
+                    {d.tercero_creado && <Badge size="lg" variant="outline" color="teal">{r.conRut ? 'Cliente nuevo - NIT (tiene RUT)' : 'Cliente nuevo'}</Badge>}
+                </Group>
+                <Button size="xs" variant="light" leftSection={<RefreshCw size={14} />} loading={consultando} onClick={alConsultar}>Consultar en SIESA</Button>
+            </Group>
+
+            {d.detalle && <Alert color={est.color} variant="light" p="sm"><Text size="sm">{d.detalle}</Text></Alert>}
+            {d.estado === 'enviando' && (
+                <Alert color="grape" icon={<AlertTriangle size={18} />}>
+                    <Text size="sm">SIESA no respondió a tiempo y no se sabe si el pedido quedó creado. Use "Consultar en SIESA":
+                        si el pedido aparece, la venta queda como enviada. Si no aparece, un administrador puede habilitarla para volver a enviarla.</Text>
+                    {esAdmin && <Button mt="sm" size="xs" color="grape" onClick={alLiberar}>Confirmo que no está en SIESA: habilitar para volver a enviar</Button>}
+                </Alert>
+            )}
+
+            <Paper withBorder radius="md" py="sm">
+                <Grid gutter={0}>
+                <Dato etiqueta="Pedido SIESA" span={{ base: 6, sm: 2.5 }} primero><Text fw={700} size="lg">{pedido?.numero || '-'}</Text>{pedido?.fecha && <Text size="xs" c="dimmed">{pedido.fecha}</Text>}</Dato>
+                <Dato etiqueta="Estado en SIESA" span={{ base: 6, sm: 2.5 }}>{pedido ? <Badge variant="light">{pedido.estadoTexto}</Badge> : <Text size="sm" c="dimmed">Sin consultar</Text>}</Dato>
+                <Dato etiqueta="Comprador" span={{ base: 6, sm: 4.5 }}><Text size="sm" fw={500} lineClamp={2}>{pedido?.terceroNombre || r.comprador}</Text><Text size="xs" c="dimmed">{conDv(r.documento || pedido?.tercero)}</Text></Dato>
+                <Dato etiqueta="Total" span={{ base: 6, sm: 2.5 }}><Text fw={700} size="lg">{pedido ? pesos(pedido.totalNeto) : (r.totalMl ? pesos(r.totalMl) : '-')}</Text>{pedido && <Text size="xs" c="dimmed">IVA {pesos(pedido.totalImp)}</Text>}</Dato>
+                </Grid>
+            </Paper>
+            <Text size="xs" c="dimmed">
+                Enviado por {fila?.enviado_por || '-'} - {fechaHora(d.actualizado_en)} - {d.intentos} intento{d.intentos === 1 ? '' : 's'}
+                {d.pedido_consultado_en ? ` - Consultado en SIESA: ${fechaHora(d.pedido_consultado_en)}` : ''}
+            </Text>
+
+            {pedido ? <LineasPedido pedido={pedido} /> : <Text size="sm" c="dimmed">Todavía no se tiene el detalle del pedido. Use "Consultar en SIESA".</Text>}
+            {pedido?.notas && <Paper bg="gray.0" radius="md" p="sm"><Text size="xs" c="dimmed">Notas del pedido</Text><Text size="sm">{pedido.notas}</Text></Paper>}
+
+            {tecnico && (
+                <Accordion variant="separated" radius="md">
+                    <Accordion.Item value="tecnico">
+                        <Accordion.Control><Text size="sm" fw={500}>Información técnica</Text></Accordion.Control>
+                        <Accordion.Panel>
+                            <Tabs defaultValue="pedido">
+                                <Tabs.List>
+                                    <Tabs.Tab value="pedido">Archivo del pedido</Tabs.Tab>
+                                    {d.documento_tercero && <Tabs.Tab value="tercero">Archivo del cliente</Tabs.Tab>}
+                                    <Tabs.Tab value="respuesta">Respuesta de SIESA</Tabs.Tab>
+                                </Tabs.List>
+                                {[['pedido', d.documento_pedido], ['tercero', d.documento_tercero], ['respuesta', d.respuesta]].map(([k, txt]) => (
+                                    <Tabs.Panel key={k} value={k} pt="sm">
+                                        <ScrollArea h={360} type="auto"><Code block fz="xs" style={{ whiteSpace: 'pre' }}>{txt || 'Sin contenido.'}</Code></ScrollArea>
+                                    </Tabs.Panel>
+                                ))}
+                            </Tabs>
+                        </Accordion.Panel>
+                    </Accordion.Item>
+                </Accordion>
+            )}
         </Stack>
     );
 }
 
 export default function Historial() {
     const { esAdmin } = useAuth();
+    const { estado: estadoSiesa } = useOutletContext() || {};
+    // Archivos técnicos: solo administradores, y se pueden ocultar en Configuración.
+    const tecnico = esAdmin && estadoSiesa?.verTecnico !== false;
     const [consultando, setConsultando] = useState(false);
     const [filas, setFilas] = useState([]);
     const [cargando, setCargando] = useState(true);
@@ -137,9 +207,10 @@ export default function Historial() {
                                         <Table.Td fz="sm">{f.venta}</Table.Td>
                                         <Table.Td fz="sm" fw={700} style={{ whiteSpace: 'nowrap' }}>{f.pedido_numero || <Text span c="dimmed" size="sm">-</Text>}</Table.Td>
                                         <Table.Td><Badge variant="light" color={est.color}>{est.texto}</Badge></Table.Td>
-                                        <Table.Td fz="sm" maw={340}>{f.detalle}</Table.Td>
+                                        <Table.Td fz="sm" style={{ whiteSpace: 'nowrap' }}>
+                                            <Tooltip label={f.detalle} multiline w={360} disabled={!f.detalle}><span>{detalleCorto(f.detalle)}</span></Tooltip></Table.Td>
                                         <Table.Td fz="sm">{f.resumen?.comprador}
-                                            <Text size="xs" c="dimmed">{f.resumen?.documento}</Text>
+                                            <Text size="xs" c="dimmed">{conDv(f.resumen?.documento)}</Text>
                                             {f.tercero_creado && <Badge mt={2} variant="outline" color="teal" size="xs">{f.resumen?.conRut ? 'cliente nuevo - NIT' : 'cliente nuevo'}</Badge>}</Table.Td>
                                         <Table.Td ta="right" fz="sm" style={{ whiteSpace: 'nowrap' }}>{f.resumen?.totalMl ? pesos(f.resumen.totalMl) : ''}</Table.Td>
                                         <Table.Td fz="sm">{f.enviado_por}</Table.Td>
@@ -153,38 +224,11 @@ export default function Historial() {
                 </Table.ScrollContainer>
             </Paper>
 
-            <Modal opened={Boolean(detalle)} onClose={() => setDetalle(null)} title={`Venta ${detalle?.venta || ''}`} size={900}>
+            <Modal opened={Boolean(detalle)} onClose={() => setDetalle(null)} size={900}
+                title={<Text fw={700}>Venta {detalle?.venta || ''}</Text>}>
                 {detalle?.cargando ? <Center h={120}><Loader /></Center> : detalle && (
-                    <Stack>
-                        <Group justify="space-between">
-                            <Group><Badge variant="light" color={ESTADOS_BD[detalle.estado]?.color}>{ESTADOS_BD[detalle.estado]?.texto}</Badge>
-                                {detalle.tercero_creado && <Badge variant="outline" color="teal">{detalle.resumen?.conRut ? 'Cliente nuevo - NIT (tiene RUT)' : 'Cliente nuevo'}</Badge>}
-                                <Text size="sm">{detalle.detalle}</Text></Group>
-                            <Button size="xs" variant="light" leftSection={<RefreshCw size={14} />} loading={consultando}
-                                onClick={() => consultarSiesa(detalle.venta)}>Consultar en SIESA</Button>
-                        </Group>
-                        {detalle.estado === 'enviando' && (
-                            <Alert color="grape" icon={<AlertTriangle size={18} />}>
-                                <Text size="sm">SIESA no respondió a tiempo y no se sabe si el pedido quedó creado. Use "Consultar en SIESA":
-                                    si el pedido aparece, la venta queda como enviada. Si no aparece, un administrador puede habilitarla para volver a enviarla.</Text>
-                                {esAdmin && <Button mt="sm" size="xs" color="grape" onClick={() => liberar(detalle.venta)}>Confirmo que no está en SIESA: habilitar para volver a enviar</Button>}
-                            </Alert>
-                        )}
-                        <Tabs defaultValue="siesa">
-                            <Tabs.List>
-                                <Tabs.Tab value="siesa">Pedido en SIESA</Tabs.Tab>
-                                {esAdmin && <Tabs.Tab value="pedido">Archivo técnico del pedido</Tabs.Tab>}
-                                {esAdmin && detalle.documento_tercero && <Tabs.Tab value="tercero">Archivo técnico del cliente</Tabs.Tab>}
-                                {esAdmin && <Tabs.Tab value="respuesta">Respuesta técnica de SIESA</Tabs.Tab>}
-                            </Tabs.List>
-                            <Tabs.Panel value="siesa" pt="sm"><PedidoSiesa pedido={detalle.pedido_siesa} consultadoEn={detalle.pedido_consultado_en} /></Tabs.Panel>
-                            {esAdmin && [['pedido', detalle.documento_pedido], ['tercero', detalle.documento_tercero], ['respuesta', detalle.respuesta]].map(([k, txt]) => (
-                                <Tabs.Panel key={k} value={k} pt="sm">
-                                    <ScrollArea h={400} type="auto"><Code block fz="xs" style={{ whiteSpace: 'pre' }}>{txt || 'Sin contenido.'}</Code></ScrollArea>
-                                </Tabs.Panel>
-                            ))}
-                        </Tabs>
-                    </Stack>
+                    <DetalleEnvio d={detalle} fila={filas.find((f) => f.venta === detalle.venta)} tecnico={tecnico} esAdmin={esAdmin}
+                        consultando={consultando} alConsultar={() => consultarSiesa(detalle.venta)} alLiberar={() => liberar(detalle.venta)} />
                 )}
             </Modal>
         </Stack>

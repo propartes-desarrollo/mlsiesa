@@ -30,6 +30,7 @@ router.get('/estado', async (req, res, next) => {
                 validarTercero: cfg.envio.validar_tercero,
                 crearTercero: cfg.envio.crear_tercero,
                 emailRespaldo: Boolean(cfg.tercero.email_respaldo),
+                verTecnico: cfg.envio.ver_tecnico,
             },
         });
     } catch (error) { next(error); }

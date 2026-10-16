@@ -22,7 +22,7 @@ const hora = (d) => d.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-
 async function validarRut(venta, cfg, dian, pasos, esperaDesde, ahora) {
     const c = venta.comprador;
     if (!cfg.envio.validar_rut || !dian || c.juridica || (c.tipoDoc || 'C') !== 'C') return { venta };
-    const rut = await dian.consultarRut(c.documento);
+    const rut = await dian.consultarRut(c.documento, { url: cfg.envio.rut_url });
     pasos.push(`DIAN ${c.documento}: ${rut.estado}${rut.nombre ? ` (${rut.nombre})` : ''}${rut.mensaje ? ` (${rut.mensaje})` : ''}`);
     if (rut.estado === 'con_rut') return { venta: { ...venta, comprador: { ...c, tipoDoc: 'N' } } };
     if (rut.estado === 'sin_rut') return { venta };

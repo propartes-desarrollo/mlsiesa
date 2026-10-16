@@ -513,6 +513,11 @@ test('persona natural con RUT: se registra con NIT (tipo N), sigue siendo person
         const F = 'vistaSelPublicacionesExterna:formSelPublicacionesExterna';
         assert.deepEqual(dianReal.interpretar(`<td>Raz&oacute;n Social</td><td><span id="${F}:razonSocial">PEREZ  GOMEZ JUAN</span></td>`),
             { estado: 'con_rut', nombre: 'PEREZ GOMEZ JUAN', mensaje: '' });
+        // Persona natural: nombres y apellidos por separado (datos ficticios).
+        const span = (id, v) => `<span id="${F}:${id}">${v}</span>`;
+        assert.deepEqual(dianReal.interpretar(span('primerApellido', 'PEREZ') + span('segundoApellido', 'GOMEZ') + span('primerNombre', 'JUAN') + span('otrosNombres', 'CARLOS')),
+            { estado: 'con_rut', nombre: 'JUAN CARLOS PEREZ GOMEZ', mensaje: '' });
+        assert.equal(dianReal.interpretar(span('primerApellido', 'PEREZ') + span('primerNombre', 'JUAN') + span('segundoApellido', '') + span('otrosNombres', '')).nombre, 'JUAN PEREZ');
         assert.equal(dianReal.interpretar('Error NIT Inv&aacute;lido.El NIT 999000008 no es v&aacute;lido. Verifique que el NIT se encuentre registrado en el RUT.').estado, 'sin_rut');
         assert.equal(dianReal.interpretar('<html>En mantenimiento</html>').estado, 'desconocido');
     });

@@ -23,10 +23,15 @@ const DEFINICIONES = [
     // Persona natural con cédula: antes de crearla se consulta en la DIAN si tiene RUT.
     ['envio.validar_rut', true, 'booleano', 'Validar el RUT en la DIAN',
         'Antes de registrar a un comprador persona natural con cédula, consulta en la DIAN si tiene RUT. Si lo tiene, se registra con NIT (tipo N).'],
+    ['envio.rut_url', 'https://muisca.dian.gov.co/WebGestionmasiva/DefSelPublicacionesExterna.faces', 'texto', 'DIAN: página de consulta del RUT',
+        'Dirección de la página pública de la DIAN donde se consulta si el comprador tiene RUT. Cámbiela solo si la DIAN la mueve.'],
     ['envio.rut_reintento_min', 10, 'numero', 'DIAN: minutos entre reintentos',
         'Si la DIAN no responde, la venta queda en espera y se vuelve a enviar sola cada tantos minutos.'],
     ['envio.rut_espera_max_min', 60, 'numero', 'DIAN: espera máxima (minutos)',
         'Si la DIAN sigue sin responder pasado este tiempo, el comprador se registra con cédula y queda un aviso para revisarlo.'],
+
+    ['envio.ver_tecnico', true, 'booleano', 'Mostrar información técnica',
+        'Muestra a los administradores los archivos técnicos del pedido y del cliente y la respuesta técnica de SIESA, en la carga y en el Historial.'],
 
     // Pedido. Campos de los registros 0430 (encabezado) y 0431 (líneas).
     ['pedido.co', '021', 'texto', 'Centro de operación', 'Centro de operación al que pertenecen los pedidos.'],

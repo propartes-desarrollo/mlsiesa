@@ -117,6 +117,8 @@ export default function Cargue() {
     const { id } = useParams();
     const { esAdmin } = useAuth();
     const { estado: estadoSiesa } = useOutletContext() || {};
+    // Archivos técnicos y pasos del envío: solo administradores, y se pueden ocultar en Configuración.
+    const tecnico = esAdmin && estadoSiesa?.verTecnico !== false;
     const [datos, setDatos] = useState(null);
     const [error, setError] = useState('');
     const [filtro, setFiltro] = useState('todas');
@@ -265,7 +267,7 @@ export default function Cargue() {
                                         {abierta && (
                                             <Table.Tr>
                                                 <Table.Td colSpan={8} bg="var(--mantine-color-gray-0)">
-                                                    <Detalle v={v} esAdmin={esAdmin} alVerDocumento={esAdmin ? verDocumento : null} />
+                                                    <Detalle v={v} esAdmin={tecnico} alVerDocumento={tecnico ? verDocumento : null} />
                                                 </Table.Td>
                                             </Table.Tr>
                                         )}

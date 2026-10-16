@@ -3,12 +3,13 @@
 //
 // Usa la página pública "Consulta de Inconsistencias" de MUISCA, que pide NIT y dígito
 // de verificación y no tiene captcha:
-//   - con RUT: muestra la razón social (el nombre de la persona).
+//   - con RUT: muestra la razón social (empresa) o los nombres y apellidos (persona natural).
 //   - sin RUT: "El NIT ... no es válido. Verifique que el NIT se encuentre registrado en el RUT."
 // No es un servicio para sistemas: se lee la página como lo haría una persona. Si la DIAN
 // la cambia o no responde, el resultado es 'desconocido' y quien llama decide.
 //
-//   consultarRut(documento) -> { estado: con_rut | sin_rut | desconocido, nombre, mensaje }
+//   consultarRut(documento, { url }) -> { estado: con_rut | sin_rut | desconocido, nombre, mensaje }
+// La dirección de la página es un parámetro (envio.rut_url); URL_DIAN es la de siempre.
 // ================================================================
 const { digitoVerificacion } = require('./siesa/documentos');
 
@@ -22,10 +23,15 @@ const decodificar = (s) => s
     .replace(/&([aeiou])acute;/gi, (m, v) => ({ a: 'á', e: 'é', i: 'í', o: 'ó', u: 'ú' })[v.toLowerCase()])
     .replace(/&ntilde;/gi, 'ñ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 
-// Interpreta la respuesta de la consulta.
+const campo = (html, id) => decodificar((html.match(new RegExp(`id="${FORM}:${id}"[^>]*>([^<]*)<`)) || [])[1] || '');
+
+// Interpreta la respuesta de la consulta. Empresa: razonSocial. Persona natural:
+// primerApellido, segundoApellido, primerNombre y otrosNombres.
 function interpretar(html) {
-    const razon = html.match(new RegExp(`id="${FORM}:razonSocial"[^>]*>([^<]*)<`));
-    if (razon && decodificar(razon[1])) return { estado: 'con_rut', nombre: decodificar(razon[1]), mensaje: '' };
+    const razon = campo(html, 'razonSocial');
+    if (razon) return { estado: 'con_rut', nombre: razon, mensaje: '' };
+    const persona = ['primerNombre', 'otrosNombres', 'primerApellido', 'segundoApellido'].map((id) => campo(html, id)).filter(Boolean).join(' ');
+    if (persona) return { estado: 'con_rut', nombre: persona, mensaje: '' };
     if (/no es v(?:á|&aacute;)lido/i.test(html) && /registrado en el RUT/i.test(html)) {
         return { estado: 'sin_rut', nombre: '', mensaje: 'No está inscrito en el RUT.' };
     }
@@ -33,7 +39,7 @@ function interpretar(html) {
 }
 
 // Campos ocultos del formulario (estado de la vista JSF) para enviar la consulta.
-function camposFormulario(html) {
+function camposFormulario(html, url = URL_DIAN) {
     const inicio = html.indexOf(`<form id="${FORM}"`);
     if (inicio < 0) return null;
     const form = html.slice(inicio, html.indexOf('</form>', inicio));
@@ -44,16 +50,16 @@ function camposFormulario(html) {
         const nombre = input.match(/name="([^"]+)"/);
         if (nombre) datos.set(nombre[1], (input.match(/value="([^"]*)"/) || [])[1] || '');
     }
-    return { action: new URL(action[1], URL_DIAN).href, datos };
+    return { action: new URL(action[1], url).href, datos };
 }
 
-async function consultarRut(documento, { timeoutMs = 20000 } = {}) {
+async function consultarRut(documento, { url = URL_DIAN, timeoutMs = 20000 } = {}) {
     const nit = String(documento || '').replace(/\D/g, '');
     if (!nit) return { estado: 'desconocido', nombre: '', mensaje: 'Sin documento.' };
     try {
-        const r1 = await fetch(URL_DIAN, { signal: AbortSignal.timeout(timeoutMs) });
+        const r1 = await fetch(url || URL_DIAN, { signal: AbortSignal.timeout(timeoutMs) });
         if (r1.status !== 200) return { estado: 'desconocido', nombre: '', mensaje: `La DIAN respondió HTTP ${r1.status}.` };
-        const form = camposFormulario(await texto(r1));
+        const form = camposFormulario(await texto(r1), url || URL_DIAN);
         if (!form) return { estado: 'desconocido', nombre: '', mensaje: 'La página de la DIAN cambió o está en mantenimiento.' };
         const cookie = r1.headers.getSetCookie().map((c) => c.split(';')[0]).join('; ');
         form.datos.set(`${FORM}:numNit`, nit);
@@ -73,4 +79,4 @@ async function consultarRut(documento, { timeoutMs = 20000 } = {}) {
     }
 }
 
-module.exports = { consultarRut, interpretar, camposFormulario };
+module.exports = { consultarRut, interpretar, camposFormulario, URL_DIAN };

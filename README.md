@@ -182,7 +182,8 @@ Usa la página pública "Consulta de Inconsistencias" de MUISCA, que no tiene ca
 
 El reintento corre en el backend cada minuto (`servicios/reintentosDian.js`), a nombre
 de quien envió la venta. Las empresas y los compradores que ya están en SIESA no se
-consultan. Se apaga con `envio.validar_rut`. La migración
+consultan. Se apaga con `envio.validar_rut`, y la dirección de la página es configurable
+(`envio.rut_url`) por si la DIAN la mueve. La migración
 `db/migraciones/0003_espera_dian.sql` agrega el estado `espera_dian`.
 
 No es un servicio de la DIAN para sistemas: si cambian la página, la consulta da "no
