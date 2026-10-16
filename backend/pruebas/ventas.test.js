@@ -102,7 +102,10 @@ describe('documentos', () => {
         assert.deepEqual(documentos.verificarLargos(lineas), []);
         const enc = lineas[1];
         assert.equal(campo(L.L430, enc, 'f430_id_tercero_fact').trim(), '1000007919');
-        assert.equal(campo(L.L430, enc, 'f430_num_docto_referencia'), '000018670875084');
+        // Referencia y número de O.C. vacíos: el # de venta va en las notas.
+        assert.equal(campo(L.L430, enc, 'f430_num_docto_referencia').trim(), '');
+        assert.equal(campo(L.L430, enc, 'f430_referencia').trim(), '');
+        assert.match(campo(L.L430, enc, 'f430_notas'), /^ML - 2000018670875084 - /);
         assert.equal(campo(L.L430, enc, 'f430_id_tercero_vendedor').trim(), 'VEN0600');
         assert.equal(campo(L.L430, enc, 'f430_id_fecha'), '20260927');
         assert.equal(campo(L.L430, enc, 'f430_id_tipo_docto'), 'PML');
@@ -152,7 +155,7 @@ describe('documentos', () => {
         assert.equal(campo(L.L200, lineas[1], 'F015_DIRECCION1').trim(), 'CLL 11 1 21');
         assert.equal(campo(L.L200, lineas[1], 'F200_NOMBRES').trim(), 'CARLOS ANDRES');
         assert.deepEqual(lineas.map((l) => l.slice(7, 11)),
-            ['0000', '0200', '0201', '0753', '0753', '0753', '0753', '0046', '0046', '0046', ...Array(10).fill('0047'), '9999']);
+            ['0000', '0200', '0201', ...Array(11).fill('0207'), '0753', '0753', '0753', '0753', '0046', '0046', '0046', ...Array(10).fill('0047'), '9999']);
         // Facturación electrónica de persona natural (importa en Pruebas, 2026-10-06).
         const fe = lineas.filter((l) => l.slice(7, 11) === '0753');
         // El detalle tributario 2 va vacío por defecto: no se envía.
@@ -172,6 +175,10 @@ describe('documentos', () => {
         assert.equal(campo(L.L201, lineas[2], 'F201_PORC_EXCESO_VENTA'), '0000.00');
         assert.equal(campo(L.L201, lineas[2], 'f201_porc_tolerancia'), '0000.00');
         assert.equal(campo(L.L200, lineas[1], 'F200_ID_TIPO_IDENT'), 'C');
+        assert.equal(campo(L.L201, lineas[2], 'F201_NOTAS').trim(), 'CREADO EN MERCADOLIBRE');
+        assert.equal(campo(L.L201, lineas[2], 'F201_ID_CO_MOVTO_FACTURA'), '040');
+        // Fuera de Bogotá no se envía barrio.
+        assert.equal(campo(L.L200, lineas[1], 'F015_ID_BARRIO').trim(), '');
         // Impuestos y retenciones con clase de 3 dígitos y valor de 2, como la plantilla 004 de TI.
         const tributarias = (tipo) => lineas.filter((l) => l.slice(7, 11) === tipo)
             .map((l) => campo(L.L046, l, 'F_ID_CLASE') + campo(L.L046, l, 'F_ID_VALOR_TERCERO'));
@@ -196,6 +203,47 @@ describe('documentos', () => {
         assert.deepEqual(tributarias('0046'), ['00101', '00201', '00301']);
         // AUTRENTA (025) y RETNEDOR (030) como retenedor.
         assert.deepEqual(tributarias('0047'), ['00100', '00200', '00300', '00400', '02100', '02200', '02300', '02400', '02501', '03001']);
+    });
+
+    test('Bogotá: la localidad va como barrio en el pedido y en el cliente', async () => {
+        const v = (await excelMl.leer(R1001)).find((x) => x.comprador.ciudadEnvio === 'Fontibón');
+        const cfg = cfgBase();
+        const ped = documentos.pedidoLineas(v, cfg);
+        assert.equal(campo(L.L430, ped[1], 'f419_id_barrio').trim(), 'FONTIBON');
+        const ter = documentos.terceroLineas(v, cfg);
+        assert.deepEqual([campo(L.L200, ter[1], 'F015_ID_DEPTO'), campo(L.L200, ter[1], 'F015_ID_CIUDAD')], ['11', '001']);
+        assert.equal(campo(L.L200, ter[1], 'F015_ID_BARRIO').trim(), 'FONTIBON');
+        assert.equal(campo(L.L201, ter[2], 'F015_ID_BARRIO').trim(), 'FONTIBON');
+        assert.equal(documentos.barrioBogota('Bogotá D.C.', 'Bogotá D.C.'), '');
+        assert.equal(documentos.barrioBogota('Medellín', 'Antioquia'), '');
+    });
+
+    test('clasificación del cliente: un registro 0207 por plan', async () => {
+        const v = (await excelMl.leer(R0928))[0];
+        const cfg = cfgBase();
+        cfg.tercero.criterios = ['NIC:0003', 'ZON: 0001'];
+        const r207 = documentos.terceroLineas(v, cfg).filter((l) => l.slice(7, 11) === '0207');
+        assert.deepEqual(r207.map((l) => [campo(L.L207, l, 'F207_ID_PLAN_CRITERIOS'), campo(L.L207, l, 'F207_ID_CRITERIO_MAYOR').trim()]),
+            [['NIC', '0003'], ['ZON', '0001']]);
+    });
+
+    test('división y segmento del cliente según los productos que más pesan', async () => {
+        const v = (await excelMl.leer(R0928))[0];
+        const t = cfgBase().tercero;
+        const plan = (lista, p) => Object.fromEntries(lista)[p];
+        const sku = v.items[0].sku;
+        // Sin segmento conocido: los de Configuración (Automotriz).
+        let c = documentos.clasificacionCliente(v, t, {});
+        assert.deepEqual([plan(c, 'D01'), plan(c, 'D02'), plan(c, 'ZON'), plan(c, 'PCO')], ['50', '52', '0207', '05']);
+        c = documentos.clasificacionCliente(v, t, { [sku]: 'MO01' });
+        assert.deepEqual([plan(c, 'D01'), plan(c, 'D02')], ['70', '71']);
+        c = documentos.clasificacionCliente(v, t, { [sku]: 'BI01' });
+        assert.deepEqual([plan(c, 'D01'), plan(c, 'D02')], ['80', '80']);
+        // Compra mixta: gana el grupo con más valor.
+        const mixta = { ...v, items: [{ sku: 'A', cantidad: 1, precioIva: 100000 }, { sku: 'B', cantidad: 3, precioIva: 50000 }] };
+        c = documentos.clasificacionCliente(mixta, t, { A: 'AU01', B: 'NA01' });
+        assert.deepEqual([plan(c, 'D01'), plan(c, 'D02')], ['70', '71']);
+        assert.equal(c.length, 11);
     });
 
     test('clases de impuesto y retención del parámetro', () => {

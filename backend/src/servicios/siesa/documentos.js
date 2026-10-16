@@ -2,14 +2,14 @@
 // DOCUMENTOS DEL CONECTOR a partir de una venta de Mercado Libre
 //
 //   pedidoLineas(venta)  -> 0000 / 0430 / 0431 x ítem (+FLETE) / [0432] / 9999
-//   terceroLineas(venta) -> 0000 / 0200 / 0201 / [0207] / 0753 (FE) / 0046 (impuestos) / 0047 (retenciones) / 9999
+//   terceroLineas(venta) -> 0000 / 0200 / 0201 / 0207 (clasificación) / 0753 (FE) / 0046 (impuestos) / 0047 (retenciones) / 9999
 //
 // Port de PSS_Order_Builder y PSS_Tercero_Builder (propartes-siesa-sync). Diferencias:
 //  - Los precios del reporte de ML vienen CON IVA. Se envía el neto
 //    (precio / (1 + IVA)) subido a peso entero: SIESA recalcula el impuesto
 //    (F_LIQUIDA_IMPUESTO = 1) y rechaza precios con fracción de centavo.
-//  - El # de venta de ML tiene 16 dígitos y f430_num_docto_referencia admite 15:
-//    van los 15 últimos, y el número completo en las notas.
+//  - Referencia y número de O.C. del pedido van vacíos: el # de venta de ML va en las
+//    notas ("ML - <número> - ..."), y por ahí lo busca CONSULTA_PEDIDO_ML.
 //  - El vendedor del pedido es el tercero MERCADO LIBRE (pedido.vendedor).
 //  - La bodega depende de la logística: Full (bodega de ML) o Colecta (BP150).
 //  - El centro de costo de cada línea es el del ítem en SIESA (ccostos, por SKU),
@@ -82,6 +82,13 @@ function referenciaDireccion(texto) {
     return P.ascii(resto).toUpperCase().replace(/^\s*REFERENCIA\s*:?/, '').replace(/[^A-Z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+// En Bogotá, ML pone la localidad en la columna "Ciudad" (Suba, Kennedy...): va como barrio.
+function barrioBogota(ciudad, depto) {
+    if (dane.normalizar(depto) !== 'bogota') return '';
+    const localidad = P.ascii(ciudad).toUpperCase().replace(/[^A-Z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim();
+    return /^BOGOTA\b/.test(localidad) ? '' : localidad.slice(0, 40);
+}
+
 function notas(venta) {
     return [`ML - ${venta.numero}`, FORMA_ENTREGA[venta.logistica]].filter(Boolean).join(' - ');
 }
@@ -109,8 +116,8 @@ function pedidoLineas(venta, cfg, ccostos = {}) {
         f430_id_tercero_rem: c.documento, f430_id_sucursal_rem: p.sucursal,
         f430_id_tipo_cli_fact: p.tipo_cli, f430_id_co_fact: p.co,
         f430_fecha_entrega: aaaammdd(entrega), f430_num_dias_entrega: dias,
-        f430_num_docto_referencia: referenciaMl(venta.numero),
-        f430_referencia: p.canal,
+        f430_num_docto_referencia: '',
+        f430_referencia: '',
         f430_id_moneda_docto: p.moneda, f430_id_moneda_conv: p.moneda_conv,
         f430_tasa_conv: 1, f430_id_moneda_local: p.moneda, f430_tasa_local: 1,
         f430_id_cond_pago: p.cond_pago, f430_notas: notas(venta),
@@ -118,6 +125,7 @@ function pedidoLineas(venta, cfg, ccostos = {}) {
         f419_contacto: c.nombreEnvio || c.nombre,
         f419_direccion1: direccionSiesa(c.direccionEnvio),
         f419_direccion2: referenciaDireccion(c.direccionEnvio),
+        f419_id_barrio: barrioBogota(c.ciudadEnvio, c.deptoEnvio),
         f419_telefono: cfg.tercero.telefono_respaldo,
         f419_email: cfg.tercero.email_respaldo,
     }));
@@ -189,7 +197,11 @@ function datosTercero(venta, cfg, municipiosAdicionales = {}) {
     // La dirección sale del "Domicilio" (envío, columna AI), así que la ciudad también:
     // la de facturación queda de respaldo.
     let [depto, ciudad] = dane.resolver(c.ciudadEnvio, c.deptoEnvio, municipiosAdicionales);
-    if (!depto) [depto, ciudad] = dane.resolver(c.ciudadFact, c.deptoFact, municipiosAdicionales);
+    let barrio = barrioBogota(c.ciudadEnvio, c.deptoEnvio);
+    if (!depto) {
+        [depto, ciudad] = dane.resolver(c.ciudadFact, c.deptoFact, municipiosAdicionales);
+        barrio = barrioBogota(c.ciudadFact, c.deptoFact);
+    }
     let direccion = direccionSiesa(c.direccionEnvio);
     if (!direccion) {
         // Sin domicilio: la de facturación, sin ", Ciudad, Departamento" (eso va en los códigos).
@@ -203,7 +215,7 @@ function datosTercero(venta, cfg, municipiosAdicionales = {}) {
         razonSocial: juridica ? c.nombre : '',
         nombres, apellido1, apellido2,
         nombreCompleto: c.nombre,
-        direccion,
+        direccion, barrio,
         pais: depto ? t.pais : '', depto, ciudad,
         telefono: t.telefono_respaldo, email: t.email_respaldo,
         fecha: aaaammdd(fechaVenta(venta)),
@@ -212,7 +224,9 @@ function datosTercero(venta, cfg, municipiosAdicionales = {}) {
 
 // roles: los que el tercero ya tiene en SIESA (es_proveedor, es_empleado...), para no
 // borrárselos al crearlo. Para un tercero nuevo van en 0.
-function terceroLineas(venta, cfg, roles = null, municipiosAdicionales = {}) {
+// segmentos: segmento (plan S01) de cada SKU en SIESA, para la división y el segmento
+// del cliente (0207). Sin ellos quedan los de Configuración.
+function terceroLineas(venta, cfg, roles = null, municipiosAdicionales = {}, segmentos = {}) {
     const t = cfg.tercero;
     const p = cfg.pedido;
     const cia = cfg.siesa.cia;
@@ -233,7 +247,7 @@ function terceroLineas(venta, cfg, roles = null, municipiosAdicionales = {}) {
         F200_IND_ACCIONISTA: rol('es_accionista'), F200_IND_OTROS: rol('es_otros'),
         F200_IND_INTERNO: rol('es_interno'),
         F015_CONTACTO: d.nombreCompleto, F015_DIRECCION1: d.direccion,
-        F015_ID_PAIS: d.pais, F015_ID_DEPTO: d.depto, F015_ID_CIUDAD: d.ciudad,
+        F015_ID_PAIS: d.pais, F015_ID_DEPTO: d.depto, F015_ID_CIUDAD: d.ciudad, F015_ID_BARRIO: d.barrio,
         F015_TELEFONO: d.telefono, F015_EMAIL: d.email, F015_CELULAR: d.telefono,
         F200_FECHA_NACIMIENTO: d.fecha, F200_IND_NO_DOMICILIADO: 0, F200_IND_ESTADO: 1,
     }));
@@ -249,17 +263,18 @@ function terceroLineas(venta, cfg, roles = null, municipiosAdicionales = {}) {
         F201_IND_BLOQUEADO: t.bloqueado, F201_IND_BLOQUEO_CUPO: t.bloqueo_cupo,
         F201_IND_BLOQUEO_MORA: t.bloqueo_mora, F201_IND_FACTURA_UNIFICADA: 0,
         F015_CONTACTO: d.nombreCompleto, F015_DIRECCION1: d.direccion,
-        F015_ID_PAIS: d.pais, F015_ID_DEPTO: d.depto, F015_ID_CIUDAD: d.ciudad,
+        F015_ID_PAIS: d.pais, F015_ID_DEPTO: d.depto, F015_ID_CIUDAD: d.ciudad, F015_ID_BARRIO: d.barrio,
         F015_TELEFONO: d.telefono, F015_EMAIL: d.email, f015_celular: d.telefono,
-        F201_FECHA_INGRESO: d.fecha, f201_id_cobrador: t.vendedor,
+        F201_FECHA_INGRESO: d.fecha, f201_id_cobrador: t.vendedor, F201_NOTAS: t.notas,
+        F201_ID_CO_MOVTO_FACTURA: t.co_movto,
     }));
 
-    if (String(t.division).trim()) {
+    for (const [plan, criterio] of clasificacionCliente(venta, t, segmentos)) {
         lineas.push(P.registro(L.L207, {
             F_NUMERO_REG: consec++, F_TIPO_REG: 207, F_SUBTIPO_REG: 0, F_VERSION_REG: 1,
             F_CIA: cia, F_ACTUALIZA_REG: t.actualiza, F207_ID_TERCERO: d.documento,
-            F207_ID_SUCURSAL: t.sucursal, F207_ID_PLAN_CRITERIOS: t.plan_division,
-            F207_ID_CRITERIO_MAYOR: t.division,
+            F207_ID_SUCURSAL: t.sucursal, F207_ID_PLAN_CRITERIOS: plan,
+            F207_ID_CRITERIO_MAYOR: criterio,
         }));
     }
 
@@ -290,6 +305,35 @@ function terceroLineas(venta, cfg, roles = null, municipiosAdicionales = {}) {
 
     lineas.push(P.control(consec, 9999, cia));
     return lineas;
+}
+
+// Criterios de clasificación del parámetro, como "plan:criterio" (registro 0207, uno por plan).
+function criteriosClasificacion(lista = []) {
+    return lista.map((s) => String(s).split(':').map((p) => p.trim())).filter(([plan, criterio]) => plan && criterio);
+}
+
+// Criterios del cliente: los fijos de Configuración, con la división (D01) y el segmento
+// (D02) según el grupo de productos que más pesa en la compra, por valor. El grupo sale del
+// segmento S01 de cada ítem ("segmento:división:segmento cliente").
+function clasificacionCliente(venta, t, segmentos = {}) {
+    const criterios = new Map(criteriosClasificacion(t.criterios));
+    const grupos = new Map();
+    for (const s of t.division_por_segmento || []) {
+        const [seg, division, segmento] = String(s).split(':').map((p) => p.trim());
+        if (seg && division && segmento) grupos.set(seg.toUpperCase(), `${division}:${segmento}`);
+    }
+    const peso = new Map();
+    for (const it of venta.items) {
+        const grupo = grupos.get(String(segmentos[it.sku] || '').trim().toUpperCase());
+        if (grupo) peso.set(grupo, (peso.get(grupo) || 0) + it.cantidad * it.precioIva);
+    }
+    const ganador = [...peso.entries()].sort((a, b) => b[1] - a[1])[0];
+    if (ganador) {
+        const [division, segmento] = ganador[0].split(':');
+        criterios.set('D01', division);
+        criterios.set('D02', segmento);
+    }
+    return [...criterios.entries()];
 }
 
 // Clases de impuesto o retención del parámetro ("clase:valor" o "clase:valor:llave") en el
@@ -327,6 +371,6 @@ function verificarLargos(lineas) {
 }
 
 module.exports = {
-    pedidoLineas, terceroLineas, lineasDetalle, datosTercero, verificarLargos, clasesTributarias,
+    pedidoLineas, terceroLineas, lineasDetalle, datosTercero, verificarLargos, clasesTributarias, criteriosClasificacion, clasificacionCliente, barrioBogota,
     neto, referenciaMl, digitoVerificacion, partirNombre, notas, bodega, LOGISTICA, direccionSiesa, referenciaDireccion,
 };

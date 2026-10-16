@@ -41,7 +41,8 @@ de enviar: si la venta ya está en SIESA, no se reenvía.
 | Ítem (`f431_referencia_item`) | SKU (= `f120_referencia`) |
 | Cantidad / precio | Unidades / "Ingresos por productos" ÷ unidades, **pasado a neto** (÷ 1,19) y subido a peso entero |
 | Línea `FLETE` | "Ingresos por envío" (solo si el comprador pagó envío), en neto |
-| `f430_num_docto_referencia` | Los 15 últimos dígitos del # de venta (tiene 16) |
+| Referencia y Número O.C. (`f430_referencia`, `f430_num_docto_referencia`) | Vacíos. El # de venta va en las notas y por ahí lo busca `CONSULTA_PEDIDO_ML` |
+| Barrio (`f419_id_barrio`, `F015_ID_BARRIO`) | Solo en Bogotá: la localidad, que ML trae en la columna "Ciudad" (Suba, Kennedy...) |
 | Dirección (cliente nuevo y envío) | "Domicilio" (columna AI) hasta el `/`, sin símbolos (`#`, `,`, `-`...) y con la vía abreviada: `Carrera 78A #80-21Sur` → `CR 78A 80 21SUR` (Calle → `CLL`, Carrera → `CR`, Avenida → `AV`, Transversal → `TV`, Diagonal → `DG`). Lo que sigue al `/` va como segundo renglón de la dirección de envío |
 | Mayúsculas | **Todo** lo que se envía a SIESA va en MAYÚSCULAS (política del ERP), salvo los correos, que van en minúsculas |
 | `f430_notas` | `ML - <# de venta completo> - Mercado Envíos Full` o `- Colecta de Mercado Envíos` |
@@ -158,7 +159,8 @@ Si el comprador no existe en SIESA, la app lo crea en un solo documento, antes d
 | Registro | Qué crea |
 |---|---|
 | `0200` | El tercero (nombres y apellidos separados, ciudad DANE) |
-| `0201` | El cliente, sucursal `001`: vendedor/cobrador `0600`, `C08`, tipo `6000`, lista `L04`, calificación `A` (obligatoria), margen máximo `0100.00` |
+| `0201` | El cliente, sucursal `001`: vendedor/cobrador `0600`, `C08`, tipo `6000`, lista `L04`, calificación `A` (obligatoria), margen máximo `0100.00`, nota `CREADO EN MERCADOLIBRE`, centro de operación del movimiento de ventas `040` |
+| `0207` | Clasificación, un registro por plan (Configuración → Avanzado): `CCO:NO`, `CLM:01`, `CMV:N`, `COM:NO`, `NIC:NO`, `PCO:05`, `PRO:NO`, `RED:01`, `ZON:0207`. División (`D01`) y segmento (`D02`) según el segmento S01 de los productos que más pesan en la compra, por valor: AU01/CO01 → `50`/`52` Automotriz, MO01/NA01 → `70`/`71` Motos, BI01 → `80`/`80` Bicicletas. Si no se sabe, `50`/`52`. El segmento lo trae `CONSULTA_ITEM_ML` |
 | `0753` x3 | Facturación electrónica 2.1 (persona natural): régimen `49`, obligación `R-99-PN`, detalle tributario 1 `ZZ` (el detalle tributario 2 no se envía) |
 | `0753` x1 | Correo FE del cliente: `tienda.virtual@propartes.com` (ML no entrega el correo del comprador) |
 | `0046` / `0047` | Impuestos y retenciones según Configuración → Avanzado (`clase:valor`, clase de 3 dígitos y valor de 2). Ambos: IVA (001), ICA (002) e INC (003) le aplican; AUTRENTA (025) retenedor; RENTA, RIVA, R.ICA, R.ICA.T, RHON, RCIM, RSER y RCOM no retiene. RETNEDOR (030): empresa retenedor, persona natural no retiene |

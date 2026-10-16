@@ -57,7 +57,6 @@ const DEFINICIONES = [
         'Se usa solo si SIESA no responde con el centro de costo del producto. Vacío = en ese caso la venta no se envía.', true],
     ['pedido.ccosto_flete', '5059', 'texto', 'Centro de costo del flete', 'Centro de costo con que se registra el envío.', true],
     ['pedido.unidad', 'UND', 'texto', 'Unidad de medida', 'Unidad de medida de los productos.', true],
-    ['pedido.canal', 'ML', 'texto', 'Referencia del canal', 'Texto que identifica en SIESA los pedidos de Mercado Libre.', true],   // f430_referencia
     ['pedido.enviar_impuestos', false, 'booleano', 'Enviar el detalle de impuestos', 'Envía el IVA de cada producto. Apagado = SIESA lo calcula.', true],   // registro 0432
     ['pedido.llave_impuesto', '', 'texto', 'Llave de impuesto', 'Código de impuesto que asigna SIESA (solo si se envía el detalle de impuestos).', true],
 
@@ -68,6 +67,8 @@ const DEFINICIONES = [
     ['tercero.vendedor', '0600', 'texto', 'Vendedor y cobrador', 'Vendedor y cobrador asignados al cliente nuevo (MERCADO LIBRE).'],
     ['tercero.cond_pago', 'C08', 'texto', 'Condición de pago', 'Condición de pago del cliente nuevo.'],
     // F201_PORC_MAX_MARGEN: entre el margen mínimo (0) y 9999. El ejemplo de TI trae 100.
+    ['tercero.co_movto', '040', 'texto', 'Centro de operación de ventas', 'Centro de operación por defecto del movimiento de ventas del cliente nuevo.'],   // F201_ID_CO_MOVTO_FACTURA
+    ['tercero.notas', 'Creado en Mercadolibre', 'texto', 'Nota del cliente nuevo', 'Observación que queda en el cliente creado desde la app.'],   // F201_NOTAS
     ['tercero.porc_max_margen', 100, 'numero', 'Margen máximo (%)', 'Porcentaje de margen máximo del cliente nuevo.'],
     ['tercero.fe_regimen_natural', '49', 'texto', 'Factura electrónica: régimen', 'Código de régimen de la persona natural (49 = No responsable de IVA).'],
     ['tercero.fe_obligacion_natural', 'R-99-PN', 'texto', 'Factura electrónica: obligación', 'Código de obligación de la persona natural (R-99-PN = No aplica - Otros).'],
@@ -84,8 +85,12 @@ const DEFINICIONES = [
     ['tercero.calificacion', 'A', 'texto', 'Calificación', 'Calificación del cliente nuevo (A, B o C).', true],
     ['tercero.pais', '169', 'texto', 'País', 'País del cliente (169 = Colombia).', true],
     ['tercero.actualiza', '1', 'texto', 'Actualizar datos tributarios', 'Si el dato ya existe, se actualiza (1) o no (0).', true],    // F_ACTUALIZA_REG
-    ['tercero.plan_division', 'S01', 'texto', 'Plan de clasificación', 'Plan de clasificación del cliente.', true],
-    ['tercero.division', '', 'texto', 'Clasificación del cliente', 'Clasificación fija para los clientes de Mercado Libre. Vacío = sin clasificación.', true],   // registro 0207
+    // Registro 0207: un criterio por plan de clasificación, como "plan:criterio".
+    ['tercero.criterios', ['CCO:NO', 'CLM:01', 'CMV:N', 'COM:NO', 'D01:50', 'D02:52', 'NIC:NO', 'PCO:05', 'PRO:NO', 'RED:01', 'ZON:0207'], 'lista', 'Clasificación del cliente',
+        'Criterios de clasificación del cliente nuevo, uno por plan, como plan:criterio. D01 (división) y D02 (segmento) se reemplazan según los productos de la compra; los de aquí se usan si no se puede saber.', true],
+    // Segmento del producto (plan S01 del ítem) -> división (D01) y segmento (D02) del cliente.
+    ['tercero.division_por_segmento', ['AU01:50:52', 'CO01:50:52', 'MO01:70:71', 'NA01:70:71', 'BI01:80:80'], 'lista', 'División según los productos',
+        'Segmento del producto en SIESA, división y segmento del cliente, como producto:división:segmento. AU01 Automóviles y CO01 Comercial diésel = Automotriz (50/52); MO01 Motos y NA01 Marine = Motos (70/71); BI01 Bicicletas = Bicicletas (80/80). Gana el grupo con más valor en la compra.', true],
     // Registros 0046 / 0047: "clase:valor" o "clase:valor:llave", clase de 3 dígitos y valor de 2.
     // Impuestos: 001 = IVA, 002 = ICA, 003 = INC. Retenciones: 001 = RENTA, 002 = RIVA, 003 = R.ICA,
     // 004 = R.ICA.T, 021 = RHON, 022 = RCIM, 023 = RSER, 024 = RCOM, 025 = AUTRENTA,

@@ -68,27 +68,29 @@ function vistaPrevia(venta, cfg, previo = null, municipios = {}) {
     };
 }
 
-// Centro de costo de cada SKU según SIESA. Devuelve { ccostos, error }: error cuando
+// Centro de costo y segmento de cada SKU según SIESA. Devuelve { ccostos, segmentos, error }: error cuando
 // algún ítem no existe, o cuando no se pudo saber su centro de costo y no hay respaldo.
 async function resolverCcostos(venta, cfg, soap, pasos) {
     const ccostos = {};
+    const segmentos = {};
     for (const sku of [...new Set(venta.items.map((it) => it.sku))]) {
         const r = await soap.consultarItem(sku, cfg.siesa);
+        if (r.segmento) segmentos[sku] = r.segmento;
         if (r.estado === 'ok') {
             ccostos[sku] = r.ccosto;
-            pasos.push(`Ítem ${sku}: centro de costo ${r.ccosto}`);
+            pasos.push(`Ítem ${sku}: centro de costo ${r.ccosto}${r.segmento ? `, segmento ${r.segmento}` : ''}`);
         } else if (r.estado === 'no_existe') {
             pasos.push(`Ítem ${sku}: ${r.mensaje}`);
-            return { ccostos, error: `El producto ${sku} no existe en SIESA. Revise el SKU de la publicación en Mercado Libre.` };
+            return { ccostos, segmentos, error: `El producto ${sku} no existe en SIESA. Revise el SKU de la publicación en Mercado Libre.` };
         } else if (cfg.pedido.ccosto) {
             pasos.push(`Ítem ${sku}: ${r.mensaje} Se usa el centro de costo de respaldo ${cfg.pedido.ccosto}.`);
         } else {
             // Sin centro de costo, SIESA rechaza el pedido.
             pasos.push(`Ítem ${sku}: ${r.mensaje}`);
-            return { ccostos, error: `No se pudo obtener la información del producto ${sku} en SIESA. Intente de nuevo en unos minutos.` };
+            return { ccostos, segmentos, error: `No se pudo obtener la información del producto ${sku} en SIESA. Intente de nuevo en unos minutos.` };
         }
     }
-    return { ccostos, error: '' };
+    return { ccostos, segmentos, error: '' };
 }
 
 // Envía una venta. Nunca lanza por errores de SIESA: devuelve { estado, mensaje, pasos }.
@@ -129,7 +131,7 @@ async function enviar(venta, cfg, ctx, { repo, soap }, municipios = {}) {
             return terminar('importado', `Esta venta ya estaba en SIESA como pedido ${previo.pedidos[0].numero}; no se vuelve a enviar.`);
         }
 
-        const { ccostos, error } = await resolverCcostos(venta, cfg, soap, pasos);
+        const { ccostos, segmentos, error } = await resolverCcostos(venta, cfg, soap, pasos);
         if (error) return terminar('error', error);
         lineasPedido = documentos.pedidoLineas(venta, cfg, ccostos);
         registro.documentoPedido = soap.documento(lineasPedido, cfg.siesa, true);
@@ -142,7 +144,9 @@ async function enviar(venta, cfg, ctx, { repo, soap }, municipios = {}) {
                 if (!cfg.envio.crear_tercero) {
                     return terminar('error', 'El comprador no está registrado en SIESA. Regístrelo en SIESA (o pida a un administrador que active el registro de compradores nuevos) y vuelva a enviar.');
                 }
-                const lineasTercero = documentos.terceroLineas(venta, cfg, t.tercero, municipios);
+                const lineasTercero = documentos.terceroLineas(venta, cfg, t.tercero, municipios, segmentos);
+                const clasif = documentos.clasificacionCliente(venta, cfg.tercero, segmentos);
+                pasos.push(`Clasificación: ${clasif.filter(([p]) => p === 'D01' || p === 'D02').map((c) => c.join(' ')).join(', ')}`);
                 registro.documentoTercero = soap.documento(lineasTercero, cfg.siesa, true);
                 const r = await soap.importar(lineasTercero, cfg.siesa);
                 pasos.push(`Crear tercero: ${r.mensaje}`);

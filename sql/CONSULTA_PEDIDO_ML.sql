@@ -2,7 +2,9 @@ PROPARTES,CONSULTA_PEDIDO_ML
 <xsd:element minOccurs="1" maxOccurs="1" name="referencia" type="xsd:string" />
 /#
 -- Pedido de venta que creo mlsiesa para una venta de Mercado Libre, con sus lineas.
--- @referencia: f430_num_docto_referencia = los 15 ultimos digitos del # de venta de ML.
+-- @referencia: los 15 ultimos digitos del # de venta de ML. Los pedidos nuevos llevan la
+-- O.C. (f430_num_docto_referencia) vacia y el # de venta en las notas ("ML - <numero> - ...");
+-- los anteriores lo tienen en la O.C. Se buscan por los dos lados.
 -- Una fila por linea; los datos del encabezado se repiten. Solo lectura.
 -- La app lee las columnas por su ALIAS: si hay que ajustar nombres de tablas o
 -- columnas, conservar los alias.
@@ -32,5 +34,6 @@ LEFT JOIN  t121_mc_items_extensiones ext ON ext.f121_rowid = mv.f431_rowid_item_
 LEFT JOIN  t120_mc_items it          ON it.f120_rowid = ext.f121_rowid_item
 LEFT JOIN  t150_mc_bodegas bod       ON bod.f150_rowid = mv.f431_rowid_bodega
 WHERE pv.f430_id_tipo_docto = 'PML'
-  AND LTRIM(RTRIM(pv.f430_num_docto_referencia)) = LTRIM(RTRIM(@referencia))
+  AND (LTRIM(RTRIM(pv.f430_num_docto_referencia)) = LTRIM(RTRIM(@referencia))
+       OR pv.f430_notas LIKE 'ML - %' + LTRIM(RTRIM(@referencia)) + '%')
 ORDER BY pv.f430_consec_docto, mv.f431_rowid

@@ -3,7 +3,7 @@
 //
 //   importar(lineas)          -> ImportarXML. ESCRIBE en el ERP: no hay modo de validación.
 //   consultarTercero(doc)     -> EjecutarConsultaXML con CONSULTA_TERCERO_ECOMMERCE.
-//   consultarItem(sku)        -> EjecutarConsultaXML con CONSULTA_ITEM_ML (centro de costo).
+//   consultarItem(sku)        -> EjecutarConsultaXML con CONSULTA_ITEM_ML (centro de costo y segmento).
 //   consultarPedido(ref)      -> EjecutarConsultaXML con CONSULTA_PEDIDO_ML (número y líneas).
 //
 // El resultado de ImportarXML viene en <printTipoError>, con HTTP 200 aun cuando
@@ -131,12 +131,14 @@ async function consultarItem(referencia, siesa) {
         resultado = await consultar(siesa.consultaItems, { referencia }, siesa);
     } catch (e) {
         if (!(e instanceof ErrorSiesa)) throw e;
-        return { estado: 'desconocido', mensaje: e.message, ccosto: '' };
+        return { estado: 'desconocido', mensaje: e.message, ccosto: '', segmento: '' };
     }
-    if (!resultado.length) return { estado: 'no_existe', mensaje: `El SKU ${referencia} no existe como ítem en SIESA.`, ccosto: '' };
+    if (!resultado.length) return { estado: 'no_existe', mensaje: `El SKU ${referencia} no existe como ítem en SIESA.`, ccosto: '', segmento: '' };
     const ccosto = String(resultado[0].ccosto_venta || '').trim();
-    if (!ccosto) return { estado: 'sin_ccosto', mensaje: `El ítem ${referencia} no tiene centro de costo de venta en SIESA.`, ccosto: '' };
-    return { estado: 'ok', mensaje: '', ccosto };
+    // Segmento del ítem (plan S01): define la división del cliente nuevo.
+    const segmento = String(resultado[0].segmento || '').trim();
+    if (!ccosto) return { estado: 'sin_ccosto', mensaje: `El ítem ${referencia} no tiene centro de costo de venta en SIESA.`, ccosto: '', segmento };
+    return { estado: 'ok', mensaje: '', ccosto, segmento };
 }
 
 const ESTADOS_PEDIDO = { 0: 'En elaboración', 1: 'Retenido', 2: 'Aprobado', 3: 'Comprometido', 4: 'Cumplido', 9: 'Anulado' };
