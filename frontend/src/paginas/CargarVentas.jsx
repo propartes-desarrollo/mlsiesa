@@ -3,7 +3,7 @@
 // ================================================================
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Stack, Title, Text, Paper, Group, Table, Badge, Anchor } from '@mantine/core';
+import { Stack, Title, Text, Paper, Group, Table, Badge, Anchor, Pagination } from '@mantine/core';
 import { Dropzone } from '@mantine/dropzone';
 import { notifications } from '@mantine/notifications';
 import { FileSpreadsheet, Upload, X } from 'lucide-react';
@@ -12,15 +12,22 @@ import { ventasMl, mensajeError } from '../api/indice';
 import { fechaHora } from '../utilidades/formato';
 
 const XLSX = ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
+const POR_PAGINA = 10;
 
 export default function CargarVentas() {
     const navegar = useNavigate();
     const [cargues, setCargues] = useState([]);
+    const [total, setTotal] = useState(0);
+    const [pagina, setPagina] = useState(1);
     const [subiendo, setSubiendo] = useState(false);
 
     useEffect(() => {
-        ventasMl.listarCargues().then(({ data }) => setCargues(data.cargues)).catch(() => {});
-    }, []);
+        ventasMl.listarCargues(pagina, POR_PAGINA)
+            .then(({ data }) => { setCargues(data.cargues); setTotal(data.total); })
+            .catch(() => {});
+    }, [pagina]);
+    const paginas = Math.max(1, Math.ceil(total / POR_PAGINA));
+    const desde = (pagina - 1) * POR_PAGINA + 1;
 
     async function subir(archivos) {
         if (!archivos.length) return;
@@ -57,7 +64,10 @@ export default function CargarVentas() {
             </Dropzone>
 
             <Paper withBorder radius="md" p="md">
-                <Text fw={700} mb="sm">Archivos cargados</Text>
+                <Group justify="space-between" mb="sm">
+                    <Text fw={700}>Archivos cargados</Text>
+                    {total > 0 && <Text size="xs" c="dimmed">{desde}-{Math.min(desde + cargues.length - 1, total)} de {total}</Text>}
+                </Group>
                 {cargues.length === 0 ? <Text c="dimmed" size="sm">Todavía no se ha cargado ningún archivo.</Text> : (
                     <Table.ScrollContainer minWidth={600}>
                         <Table highlightOnHover verticalSpacing="xs">
@@ -81,6 +91,7 @@ export default function CargarVentas() {
                         </Table>
                     </Table.ScrollContainer>
                 )}
+                {paginas > 1 && <Group justify="center" mt="md"><Pagination total={paginas} value={pagina} onChange={setPagina} size="sm" /></Group>}
             </Paper>
         </Stack>
     );

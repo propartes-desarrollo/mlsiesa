@@ -5,7 +5,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useParams, useOutletContext, Link } from 'react-router-dom';
 import {
     Stack, Title, Text, Paper, Group, Table, Badge, Alert, Checkbox, Button, SegmentedControl,
-    SimpleGrid, Modal, Code, ScrollArea, List, Loader, Center, Anchor, ActionIcon, Tooltip,
+    SimpleGrid, Grid, Modal, Code, ScrollArea, List, Loader, Center, Anchor, ActionIcon, Tooltip,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { AlertTriangle, ChevronDown, ChevronRight, Send, FileText, ArrowLeft, Ban } from 'lucide-react';
@@ -23,15 +23,19 @@ function Resumen({ ventas }) {
         ['Enviadas a SIESA', cuenta('enviada'), 'blue'],
         ['Esperando la DIAN', cuenta('en_espera'), 'cyan'],
     ].filter(([t, n]) => n > 0 || t !== 'Esperando la DIAN');
+    // Una sola caja, separada por líneas verticales (como el detalle del Historial).
     return (
-        <SimpleGrid cols={{ base: 2, sm: datos.length }}>
-            {datos.map(([t, n, c]) => (
-                <Paper key={t} withBorder radius="md" p="sm">
-                    <Text fz={22} fw={700} c={c}>{n}</Text>
-                    <Text size="xs" c="dimmed">{t}</Text>
-                </Paper>
-            ))}
-        </SimpleGrid>
+        <Paper withBorder radius="md" py="sm">
+            <Grid gutter={0}>
+                {datos.map(([t, n, c], i) => (
+                    <Grid.Col key={t} span={{ base: 6, sm: 12 / datos.length }} px="md" py={4}
+                        style={i === 0 ? undefined : { borderLeft: '1px solid var(--mantine-color-gray-3)' }}>
+                        <Text size="xs" c="dimmed" mb={4}>{t}</Text>
+                        <Text fz={22} fw={700} c={c} lh={1.2}>{n}</Text>
+                    </Grid.Col>
+                ))}
+            </Grid>
+        </Paper>
     );
 }
 

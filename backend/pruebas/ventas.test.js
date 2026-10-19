@@ -275,6 +275,7 @@ describe('documentos', () => {
         assert.deepEqual(dane.resolver('Cereté', 'Córdoba'), ['23', '162']);
         assert.deepEqual(dane.resolver('Cali', 'Valle Del Cauca'), ['76', '001']);
         assert.deepEqual(dane.resolver('Tumaco', 'Nariño'), ['52', '835']);
+        assert.deepEqual(dane.resolver('Buga', 'Valle Del Cauca'), ['76', '111']);
         assert.deepEqual(dane.resolver('Inventado', 'Antioquia'), ['', '']);
         assert.deepEqual(dane.resolver('Inventado', 'Antioquia', { '05': { inventado: '999' } }), ['05', '999']);
     });

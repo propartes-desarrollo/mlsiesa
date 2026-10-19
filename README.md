@@ -12,6 +12,15 @@ El orden de implementación está en [`docs/orden_implementacion.md`](docs/orden
 > Reutiliza el conector validado en `propartes-siesa-sync` (tienda WooCommerce): mismo plano
 > de ancho fijo, mismos layouts y mismas lecciones aprendidas sobre lo que SIESA rechaza.
 
+## Manual
+
+El manual completo está en [`docs/manual/`](docs/manual/README.md):
+
+- [Manual de usuario](docs/manual/01-manual-de-usuario.md): cargar, revisar y enviar ventas; estados y mensajes.
+- [Referencia de configuración](docs/manual/02-configuracion.md): cada valor de la pantalla Configuración.
+- [Manual de edición del código](docs/manual/03-manual-de-edicion.md): qué archivo y qué línea cambiar para cada ajuste.
+- [Operación y despliegue](docs/manual/04-operacion-y-despliegue.md): instalación, producción, migraciones y problemas frecuentes.
+
 ## Flujo
 
 1. **Cargar ventas**: se sube el Excel. El backend lo lee, agrupa los paquetes ("Paquete de N
@@ -149,7 +158,7 @@ hallazgo de `propartes-siesa-sync`).
 La ciudad del comprador se convierte al código DANE con el listado oficial completo
 (`backend/src/servicios/datos/divipola.json`, 1.122 municipios de datos.gov.co) más unos
 alias para los nombres cortos que usa Mercado Libre (Cali, Cartagena, Cúcuta, Tumaco,
-Mompós). Si aun así una ciudad no se reconoce, el administrador la agrega en
+Mompós, Buga). Si aun así una ciudad no se reconoce, el administrador la agrega en
 Configuración → Municipios.
 
 ## Creación de terceros
@@ -198,8 +207,9 @@ Hay que cerrarlos con TI y contabilidad. Ninguno bloquea la revisión de las ven
    empresas faltan sus códigos FE y las retenciones (ver "Creación de terceros").
 2. **Precios con IVA**: se asume IVA 19 % para todo producto. Un ítem exento quedaría con el
    neto mal calculado.
-3. **Conexión de producción**: hoy `SIESA_CONEXION=Pruebas` con el usuario `ia`. Para pasar a
-   producción se cambian `SIESA_CONEXION`, `SIESA_USUARIO` y `SIESA_CLAVE` en `backend/.env` del
-   servidor y se reinicia el backend. El usuario de producción necesita las tres consultas y permiso
+3. **Conexión con SIESA**: Pruebas = conexión `Pruebas` con el usuario `ia`; producción = conexión
+   `Propartes Real` con el usuario `ml`. Se elige en `backend/.env` (`SIESA_CONEXION`, `SIESA_USUARIO`,
+   `SIESA_CLAVE`) y se recrea el backend (`docker compose up -d --force-recreate mlsiesa_backend`).
+   Detalle en [docs/manual/04-operacion-y-despliegue.md](docs/manual/04-operacion-y-despliegue.md). El usuario de producción necesita las tres consultas y permiso
    para importar pedidos y terceros. En Configuración → Conexión con SIESA se ven estos datos (sin la
    clave), solo para consulta: por seguridad no se cambian desde la app.

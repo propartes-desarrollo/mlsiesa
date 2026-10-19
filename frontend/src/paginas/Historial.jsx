@@ -7,8 +7,10 @@ import {
     Button, Alert, Tabs, Loader, Center, Grid, Accordion,
 } from '@mantine/core';
 import { useDebouncedValue } from '@mantine/hooks';
+import { DatePickerInput } from '@mantine/dates';
+import dayjs from 'dayjs';
 import { notifications } from '@mantine/notifications';
-import { Search, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Search, AlertTriangle, RefreshCw, Calendar } from 'lucide-react';
 import { envios, mensajeError } from '../api/indice';
 import { useOutletContext } from 'react-router-dom';
 import { useAuth } from '../contexto/ContextoAuth';
@@ -135,18 +137,24 @@ export default function Historial() {
     const [estado, setEstado] = useState(null);
     const [buscar, setBuscar] = useState('');
     const [buscarDiferido] = useDebouncedValue(buscar, 300);
+    const [fechas, setFechas] = useState([null, null]);
+    const dia = (f) => (f ? dayjs(f).format('YYYY-MM-DD') : undefined);
     const [detalle, setDetalle] = useState(null);
 
     async function cargar() {
         setCargando(true);
         try {
-            const { data } = await envios.listar({ estado: estado || undefined, buscar: buscarDiferido || undefined });
+            const { data } = await envios.listar({
+                estado: estado || undefined, buscar: buscarDiferido || undefined,
+                // Con solo la fecha inicial elegida, se filtra ese día.
+                desde: dia(fechas[0]), hasta: dia(fechas[1] || fechas[0]),
+            });
             setFilas(data.envios);
         } catch (e) {
             notifications.show({ color: 'red', message: mensajeError(e) });
         } finally { setCargando(false); }
     }
-    useEffect(() => { cargar(); }, [estado, buscarDiferido]);   // eslint-disable-line react-hooks/exhaustive-deps
+    useEffect(() => { cargar(); }, [estado, buscarDiferido, fechas]);   // eslint-disable-line react-hooks/exhaustive-deps
 
     async function abrir(venta) {
         setDetalle({ venta, cargando: true });
@@ -180,13 +188,15 @@ export default function Historial() {
         <Stack>
             <div>
                 <Title order={3}>Historial de envíos</Title>
-                <Text c="dimmed" size="sm">Las ventas enviadas a SIESA y el pedido que se creó para cada una.</Text>
+                <Text c="dimmed" size="sm">Ventas enviadas a SIESA y el pedido que se creó para cada una.</Text>
             </div>
             <Group>
                 <TextInput leftSection={<Search size={16} />} placeholder="# de venta, pedido, comprador o documento" value={buscar}
                     onChange={(e) => setBuscar(e.currentTarget.value)} w={320} />
                 <Select placeholder="Todos los estados" clearable value={estado} onChange={setEstado} w={220}
                     data={Object.entries(ESTADOS_BD).map(([value, { texto }]) => ({ value, label: texto }))} />
+                <DatePickerInput type="range" placeholder="Fecha de envío" value={fechas} onChange={setFechas} clearable allowSingleDateInRange
+                    valueFormat="DD MMM YYYY" maxDate={new Date()} leftSection={<Calendar size={16} />} w={260} />
             </Group>
 
             <Paper withBorder radius="md">

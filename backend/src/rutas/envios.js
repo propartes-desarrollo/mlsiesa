@@ -20,11 +20,14 @@ const numeroVenta = param('venta').matches(/^\d{6,30}$/).withMessage('Número de
 
 // GET /api/envios?estado=&buscar=
 router.get('/', [
-    query('estado').optional({ values: 'falsy' }).isIn(['enviando', 'importado', 'rechazado', 'error']),
+    query('estado').optional({ values: 'falsy' }).isIn(['enviando', 'importado', 'rechazado', 'error', 'espera_dian']),
     query('buscar').optional().trim().isLength({ max: 60 }),
+    query('desde').optional({ values: 'falsy' }).isISO8601({ strict: true }),
+    query('hasta').optional({ values: 'falsy' }).isISO8601({ strict: true }),
 ], validar, async (req, res, next) => {
     try {
-        res.json({ exito: true, envios: await envios.historial({ estado: req.query.estado, buscar: req.query.buscar }) });
+        const { estado, buscar, desde, hasta } = req.query;
+        res.json({ exito: true, envios: await envios.historial({ estado, buscar, desde, hasta }) });
     } catch (error) { next(error); }
 });
 

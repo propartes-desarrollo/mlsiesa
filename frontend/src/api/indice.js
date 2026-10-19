@@ -47,7 +47,7 @@ export const ventasMl = {
         datos.append('archivo', archivo);
         return api.post('/ventas-ml/cargues', datos, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 60000 });
     },
-    listarCargues: () => api.get('/ventas-ml/cargues'),
+    listarCargues: (pagina = 1, porPagina = 10) => api.get('/ventas-ml/cargues', { params: { pagina, porPagina } }),
     obtenerCargue: (id) => api.get(`/ventas-ml/cargues/${id}`),
     documento: (id, venta, tipo) => api.get(`/ventas-ml/cargues/${id}/ventas/${venta}/documento`, { params: { tipo } }),
     // SIESA puede tardar (crear tercero + pedido): hasta 2 x 180 s.

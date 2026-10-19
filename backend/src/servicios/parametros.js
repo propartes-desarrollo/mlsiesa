@@ -23,7 +23,7 @@ const DEFINICIONES = [
     // Persona natural con cédula: antes de crearla se consulta en la DIAN si tiene RUT.
     ['envio.validar_rut', true, 'booleano', 'Validar el RUT en la DIAN',
         'Antes de registrar a un comprador persona natural con cédula, consulta en la DIAN si tiene RUT. Si lo tiene, se registra con NIT (tipo N).'],
-    ['envio.rut_url', 'https://muisca.dian.gov.co/WebGestionmasiva/DefSelPublicacionesExterna.faces', 'texto', 'DIAN: página de consulta del RUT',
+    ['envio.rut_url', 'https://muisca.dian.gov.co/WebGestionmasiva/DefSelPublicacionesExterna.faces', 'texto', 'Página de consulta del RUT en la DIAN',
         'Dirección de la página pública de la DIAN donde se consulta si el comprador tiene RUT. Cámbiela solo si la DIAN la mueve.'],
     ['envio.rut_reintento_min', 10, 'numero', 'DIAN: minutos entre reintentos',
         'Si la DIAN no responde, la venta queda en espera y se vuelve a enviar sola cada tantos minutos.'],
@@ -78,9 +78,9 @@ const DEFINICIONES = [
     ['tercero.telefono_respaldo', '', 'texto', 'Teléfono de los clientes nuevos', 'Mercado Libre no entrega el teléfono del comprador. Vacío = sin teléfono.'],
     ['tercero.vendedor', '0600', 'texto', 'Vendedor y cobrador', 'Vendedor y cobrador asignados al cliente nuevo (MERCADO LIBRE).'],
     ['tercero.cond_pago', 'C08', 'texto', 'Condición de pago', 'Condición de pago del cliente nuevo.'],
-    // F201_PORC_MAX_MARGEN: entre el margen mínimo (0) y 9999. El ejemplo de TI trae 100.
     ['tercero.co_movto', '040', 'texto', 'Centro de operación de ventas', 'Centro de operación por defecto del movimiento de ventas del cliente nuevo.'],   // F201_ID_CO_MOVTO_FACTURA
     ['tercero.notas', 'Creado en Mercadolibre', 'texto', 'Nota del cliente nuevo', 'Observación que queda en el cliente creado desde la app.'],   // F201_NOTAS
+    // F201_PORC_MAX_MARGEN: entre el margen mínimo (0) y 9999. El ejemplo de TI trae 100.
     ['tercero.porc_max_margen', 100, 'numero', 'Margen máximo (%)', 'Porcentaje de margen máximo del cliente nuevo.'],
     ['tercero.fe_regimen_natural', '49', 'texto', 'Factura electrónica: régimen', 'Código de régimen de la persona natural (49 = No responsable de IVA).'],
     ['tercero.fe_obligacion_natural', 'R-99-PN', 'texto', 'Factura electrónica: obligación', 'Código de obligación de la persona natural (R-99-PN = No aplica - Otros).'],

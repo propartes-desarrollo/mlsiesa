@@ -56,7 +56,6 @@ function lineasDetalle(venta, cfg, ccostos = {}) {
     return out;
 }
 
-// Lo pide el equipo en todos los pedidos: "ML - <# de venta> - <forma de entrega>".
 // Dirección para SIESA. Facturación no acepta símbolos (#, comas, guiones...), y el tipo
 // de vía va abreviado. Del "Domicilio" de Mercado Libre se toma lo que va antes de "/":
 //   "Carrera 78A #80-21Sur / Referencia: Conjunto ... - Bosa, Bogotá D.C." -> "CR 78A 80 21SUR"
@@ -89,6 +88,7 @@ function barrioBogota(ciudad, depto) {
     return /^BOGOTA\b/.test(localidad) ? '' : localidad.slice(0, 40);
 }
 
+// Lo pide el equipo en todos los pedidos: "ML - <# de venta> - <forma de entrega>".
 function notas(venta) {
     return [`ML - ${venta.numero}`, FORMA_ENTREGA[venta.logistica]].filter(Boolean).join(' - ');
 }

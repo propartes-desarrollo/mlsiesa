@@ -90,7 +90,8 @@ async function liberar(venta) {
     return rowCount === 1;
 }
 
-async function historial({ estado, buscar, limite = 200 }) {
+// desde / hasta: fechas AAAA-MM-DD (hora de Colombia) del último envío, ambas incluidas.
+async function historial({ estado, buscar, desde, hasta, limite = 200 }) {
     const { rows } = await consulta(
         `SELECT e.venta, e.estado, e.detalle, e.intentos, e.tercero_creado, e.resumen,
                 e.pedido_siesa->>'numero' AS pedido_numero,
@@ -103,9 +104,11 @@ async function historial({ estado, buscar, limite = 200 }) {
                  OR e.resumen->>'comprador' ILIKE '%' || $2 || '%'
                  OR e.resumen->>'documento' ILIKE '%' || $2 || '%'
                  OR e.pedido_siesa->>'numero' ILIKE '%' || $2 || '%')
+            AND ($4::date IS NULL OR (e.actualizado_en AT TIME ZONE 'America/Bogota')::date >= $4::date)
+            AND ($5::date IS NULL OR (e.actualizado_en AT TIME ZONE 'America/Bogota')::date <= $5::date)
           ORDER BY e.actualizado_en DESC
           LIMIT $3`,
-        [estado || null, buscar || null, limite]);
+        [estado || null, buscar || null, limite, desde || null, hasta || null]);
     return rows;
 }
 

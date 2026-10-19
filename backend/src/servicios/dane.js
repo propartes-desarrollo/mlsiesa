@@ -56,6 +56,7 @@ const DIVIPOLA = require('./datos/divipola.json');
 const ALIAS_EXTRA = {
     '13': { 'mompox': '468', 'mompos': '468' },   // Santa Cruz de Mompox
     '52': { 'tumaco': '835' },                    // San Andrés de Tumaco
+    '76': { 'buga': '111' },                      // Guadalajara de Buga
 };
 
 // Tabla inicial, escrita a mano. Coincide con DIVIPOLA en los 75 municipios que

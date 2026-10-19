@@ -74,14 +74,23 @@ router.post('/cargues', requiereRol('admin', 'usuario'), subida.single('archivo'
 });
 
 // GET /api/ventas-ml/cargues
-router.get('/cargues', [query('limite').optional().isInt({ min: 1, max: 200 })], validar, async (req, res, next) => {
+// Paginado, del más reciente al más antiguo: ?pagina=1&porPagina=10
+router.get('/cargues', [
+    query('pagina').optional().isInt({ min: 1 }),
+    query('porPagina').optional().isInt({ min: 1, max: 100 }),
+], validar, async (req, res, next) => {
     try {
-        const { rows } = await consulta(
-            `SELECT c.id, c.archivo, c.total_ventas, c.creado_en, u.nombre AS cargado_por,
-                    (SELECT COUNT(*) FROM envios e WHERE e.cargue_id = c.id AND e.estado = 'importado')::int AS importadas
-               FROM cargues c LEFT JOIN usuarios u ON u.id = c.cargado_por
-              ORDER BY c.creado_en DESC LIMIT $1`, [Number(req.query.limite) || 30]);
-        res.json({ exito: true, cargues: rows });
+        const porPagina = Number(req.query.porPagina) || 10;
+        const pagina = Number(req.query.pagina) || 1;
+        const [{ rows }, total] = await Promise.all([
+            consulta(
+                `SELECT c.id, c.archivo, c.total_ventas, c.creado_en, u.nombre AS cargado_por,
+                        (SELECT COUNT(*) FROM envios e WHERE e.cargue_id = c.id AND e.estado = 'importado')::int AS importadas
+                   FROM cargues c LEFT JOIN usuarios u ON u.id = c.cargado_por
+                  ORDER BY c.creado_en DESC LIMIT $1 OFFSET $2`, [porPagina, (pagina - 1) * porPagina]),
+            consulta('SELECT COUNT(*)::int AS n FROM cargues'),
+        ]);
+        res.json({ exito: true, cargues: rows, total: total.rows[0].n, pagina, porPagina });
     } catch (error) { next(error); }
 });
 

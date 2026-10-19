@@ -22,12 +22,6 @@ const GRUPOS = [
     ['avanzado', 'Avanzado', (p) => p.avanzado],
 ];
 
-const mostrar = (p, v) => {
-    if (p.tipo === 'booleano') return v ? 'Encendido' : 'Apagado';
-    if (p.tipo === 'lista') return v.join(', ');
-    return String(v) || '(vacío)';
-};
-
 function FilaParametro({ p, editable, alGuardar, alRestaurar }) {
     const [valor, setValor] = useState(p.tipo === 'lista' ? p.valor.join(', ') : p.valor);
     useEffect(() => { setValor(p.tipo === 'lista' ? p.valor.join(', ') : p.valor); }, [p.valor, p.tipo]);
@@ -57,7 +51,6 @@ function FilaParametro({ p, editable, alGuardar, alRestaurar }) {
             </Table.Td>
             <Table.Td fz="sm">
                 {p.descripcion}
-                {p.modificado && <Text size="xs" c="dimmed">Valor original: {mostrar(p, p.defecto)}</Text>}
             </Table.Td>
             <Table.Td w={40}>
                 {editable && p.modificado && (
