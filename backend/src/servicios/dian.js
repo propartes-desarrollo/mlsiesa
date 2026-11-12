@@ -8,7 +8,8 @@
 // No es un servicio para sistemas: se lee la página como lo haría una persona. Si la DIAN
 // la cambia o no responde, el resultado es 'desconocido' y quien llama decide.
 //
-//   consultarRut(documento, { url }) -> { estado: con_rut | sin_rut | desconocido, nombre, mensaje }
+//   consultarRut(documento, { url }) -> { estado: con_rut | sin_rut | desconocido, nombre, partes, mensaje }
+//   partes (solo persona natural con RUT): { nombres, apellido1, apellido2 } tal como están en el RUT.
 // La dirección de la página es un parámetro (envio.rut_url); URL_DIAN es la de siempre.
 // ================================================================
 const { digitoVerificacion } = require('./siesa/documentos');
@@ -29,13 +30,17 @@ const campo = (html, id) => decodificar((html.match(new RegExp(`id="${FORM}:${id
 // primerApellido, segundoApellido, primerNombre y otrosNombres.
 function interpretar(html) {
     const razon = campo(html, 'razonSocial');
-    if (razon) return { estado: 'con_rut', nombre: razon, mensaje: '' };
-    const persona = ['primerNombre', 'otrosNombres', 'primerApellido', 'segundoApellido'].map((id) => campo(html, id)).filter(Boolean).join(' ');
-    if (persona) return { estado: 'con_rut', nombre: persona, mensaje: '' };
-    if (/no es v(?:á|&aacute;)lido/i.test(html) && /registrado en el RUT/i.test(html)) {
-        return { estado: 'sin_rut', nombre: '', mensaje: 'No está inscrito en el RUT.' };
+    if (razon) return { estado: 'con_rut', nombre: razon, partes: null, mensaje: '' };
+    const [n1, n2, a1, a2] = ['primerNombre', 'otrosNombres', 'primerApellido', 'segundoApellido'].map((id) => campo(html, id));
+    const persona = [n1, n2, a1, a2].filter(Boolean).join(' ');
+    if (persona) {
+        const partes = a1 ? { nombres: [n1, n2].filter(Boolean).join(' '), apellido1: a1, apellido2: a2 } : null;
+        return { estado: 'con_rut', nombre: persona, partes, mensaje: '' };
     }
-    return { estado: 'desconocido', nombre: '', mensaje: 'La respuesta de la DIAN no se pudo interpretar.' };
+    if (/no es v(?:á|&aacute;)lido/i.test(html) && /registrado en el RUT/i.test(html)) {
+        return { estado: 'sin_rut', nombre: '', partes: null, mensaje: 'No está inscrito en el RUT.' };
+    }
+    return { estado: 'desconocido', nombre: '', partes: null, mensaje: 'La respuesta de la DIAN no se pudo interpretar.' };
 }
 
 // Campos ocultos del formulario (estado de la vista JSF) para enviar la consulta.

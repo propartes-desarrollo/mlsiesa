@@ -5,9 +5,9 @@
 //   terceroLineas(venta) -> 0000 / 0200 / 0201 / 0207 (clasificación) / 0753 (FE) / 0046 (impuestos) / 0047 (retenciones) / 9999
 //
 // Port de PSS_Order_Builder y PSS_Tercero_Builder (propartes-siesa-sync). Diferencias:
-//  - Los precios del reporte de ML vienen CON IVA. Se envía el neto
-//    (precio / (1 + IVA)) subido a peso entero: SIESA recalcula el impuesto
-//    (F_LIQUIDA_IMPUESTO = 1) y rechaza precios con fracción de centavo.
+//  - Los precios del reporte de ML vienen CON IVA. Se envía el neto (precio / (1 + IVA))
+//    en centavos: SIESA recalcula el impuesto (F_LIQUIDA_IMPUESTO = 1) y el total queda
+//    igual a lo cobrado en ML. Acepta 2 decimales y rechaza más.
 //  - Referencia y número de O.C. del pedido van vacíos: el # de venta de ML va en las
 //    notas ("ML - <número> - ..."), y por ahí lo busca CONSULTA_PEDIDO_ML.
 //  - El vendedor del pedido es el tercero MERCADO LIBRE (pedido.vendedor).
@@ -22,7 +22,7 @@ const dane = require('../dane');
 const NATURAL = '1';
 const JURIDICA = '2';
 
-const neto = (precioIva, ivaPct) => P.ceilPesos(precioIva / (1 + ivaPct / 100));
+const neto = (precioIva, ivaPct) => P.centavos(precioIva / (1 + ivaPct / 100));
 const referenciaMl = (numero) => String(numero).slice(-15);
 
 const aaaammdd = (f) => `${f.getFullYear()}${String(f.getMonth() + 1).padStart(2, '0')}${String(f.getDate()).padStart(2, '0')}`;
@@ -193,7 +193,10 @@ function datosTercero(venta, cfg, municipiosAdicionales = {}) {
     const c = venta.comprador;
     const t = cfg.tercero;
     const juridica = c.juridica;
-    const [nombres, apellido1, apellido2] = juridica ? ['', '', ''] : partirNombre(c.nombre);
+    // Persona natural con RUT: nombres y apellidos de la DIAN (procesoVentas.validarRut).
+    const dian = !juridica && c.nombresDian;
+    const [nombres, apellido1, apellido2] = juridica ? ['', '', '']
+        : dian ? [dian.nombres, dian.apellido1, dian.apellido2 || ''] : partirNombre(c.nombre);
     // La dirección sale del "Domicilio" (envío, columna AI), así que la ciudad también:
     // la de facturación queda de respaldo.
     let [depto, ciudad] = dane.resolver(c.ciudadEnvio, c.deptoEnvio, municipiosAdicionales);
@@ -214,7 +217,7 @@ function datosTercero(venta, cfg, municipiosAdicionales = {}) {
         tipoIdent: juridica ? 'N' : (c.tipoDoc || 'C'),
         razonSocial: juridica ? c.nombre : '',
         nombres, apellido1, apellido2,
-        nombreCompleto: c.nombre,
+        nombreCompleto: dian ? [nombres, apellido1, apellido2].filter(Boolean).join(' ') : c.nombre,
         direccion, barrio,
         pais: depto ? t.pais : '', depto, ciudad,
         telefono: t.telefono_respaldo, email: t.email_respaldo,
@@ -372,5 +375,5 @@ function verificarLargos(lineas) {
 
 module.exports = {
     pedidoLineas, terceroLineas, lineasDetalle, datosTercero, verificarLargos, clasesTributarias, criteriosClasificacion, clasificacionCliente, barrioBogota,
-    neto, referenciaMl, digitoVerificacion, partirNombre, notas, bodega, LOGISTICA, direccionSiesa, referenciaDireccion,
+    NATURAL, JURIDICA, neto, referenciaMl, digitoVerificacion, partirNombre, notas, bodega, LOGISTICA, direccionSiesa, referenciaDireccion,
 };

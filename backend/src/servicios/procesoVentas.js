@@ -13,6 +13,7 @@ const BLOQUEO_ENTREGA_GUARDADO = /^(La forma de entrega "|Venta con entrega ")/;
 const ESTADO_UI = { importado: 'enviada', rechazado: 'rechazada', error: 'con_error', enviando: 'en_proceso', espera_dian: 'en_espera' };
 
 const MINUTO = 60 * 1000;
+const AVISO_EMPRESA_CREADA = 'Cliente empresa creado con los datos tributarios estándar. Debe revisarlos en SIESA antes de facturar.';
 const hora = (d) => d.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Bogota' });
 
 // Persona natural con cédula: si tiene RUT en la DIAN se registra con NIT (tipo N), sigue
@@ -24,13 +25,29 @@ async function validarRut(venta, cfg, dian, pasos, esperaDesde, ahora) {
     if (!cfg.envio.validar_rut || !dian || c.juridica || (c.tipoDoc || 'C') !== 'C') return { venta };
     const rut = await dian.consultarRut(c.documento, { url: cfg.envio.rut_url });
     pasos.push(`DIAN ${c.documento}: ${rut.estado}${rut.nombre ? ` (${rut.nombre})` : ''}${rut.mensaje ? ` (${rut.mensaje})` : ''}`);
-    if (rut.estado === 'con_rut') return { venta: { ...venta, comprador: { ...c, tipoDoc: 'N' } } };
+    // Con RUT, nombres y apellidos salen del RUT: los de Mercado Libre los escribe el
+    // comprador y a veces vienen incompletos ("Wilson S") o en otro orden.
+    if (rut.estado === 'con_rut') return { venta: { ...venta, comprador: { ...c, tipoDoc: 'N', nombresDian: rut.partes || null } } };
     if (rut.estado === 'sin_rut') return { venta };
     const desde = esperaDesde ? new Date(esperaDesde) : ahora;
     if (ahora - desde < Number(cfg.envio.rut_espera_max_min) * MINUTO) {
         return { venta, espera: { desde, proximo: new Date(ahora.getTime() + Number(cfg.envio.rut_reintento_min) * MINUTO) } };
     }
     return { venta, aviso: 'La DIAN no respondió y no se pudo validar si el comprador tiene RUT: se registró con cédula. Revise en la DIAN si tiene RUT y, si lo tiene, actualice el cliente en SIESA.' };
+}
+
+// Empresa: Mercado Libre no informa sus datos tributarios, así que si no existe en SIESA se
+// crea con los de Configuración → Cliente nuevo (los mismos para toda empresa).
+const AVISO_EMPRESA = 'Comprador empresa (NIT): si no existe en SIESA, se crea con los datos tributarios estándar para empresas; debe revisarlos en SIESA antes de facturar.';
+
+// Contabilidad pide nombres y dos apellidos completos. Devuelve el motivo, o '' si está completo.
+function nombreIncompleto({ nombres, apellido1, apellido2 }) {
+    const corto = (s) => s.replace(/\./g, '').length <= 2;
+    const palabras = [nombres, apellido1, apellido2].join(' ').split(/\s+/).filter(Boolean);
+    if (!apellido1) return 'sin apellidos';
+    if (palabras.some(corto)) return 'tiene iniciales o palabras de una o dos letras';
+    if (!apellido2) return 'un solo apellido';
+    return '';
 }
 
 function vistaPrevia(venta, cfg, previo = null, municipios = {}) {
@@ -46,7 +63,13 @@ function vistaPrevia(venta, cfg, previo = null, municipios = {}) {
     if (tercero && !tercero.depto) {
         alertas.push(`La ciudad "${c.ciudadFact || c.ciudadEnvio}, ${c.deptoFact || c.deptoEnvio}" no está registrada en la app: si el comprador es nuevo, quedaría en SIESA sin ciudad. Un administrador puede agregarla.`);
     }
-    if (c.juridica) alertas.push('El comprador es una empresa: si no está registrada en SIESA, un administrador debe revisar sus datos tributarios antes de enviar.');
+    if (c.juridica) alertas.push(AVISO_EMPRESA);
+    if (tercero && tercero.tipo === documentos.NATURAL) {
+        const falta = nombreIncompleto(tercero);
+        if (falta) {
+            alertas.push('Datos del comprador posiblemente incompletos: en SIESA queda como se cargó. Si tiene RUT, al enviar se usan los nombres y apellidos de la DIAN; si no, el cliente se crea así y hay que editar el Tercero antes de facturar.');
+        }
+    }
     const idBodega = documentos.bodega(venta, cfg);
     if (venta.logistica === undefined) {
         bloqueos.push('Este archivo se cargó con una versión anterior de la app: vuelva a subirlo.');
@@ -149,6 +172,7 @@ async function enviar(venta, cfg, ctx, { repo, soap, dian, ahora = () => new Dat
         return {
             estado: ESTADO_UI[estado], mensaje: detalle, pasos,
             terceroCreado: registro.terceroCreado, conRut: Boolean(registro.resumen.conRut),
+            nombreDian: registro.resumen.nombreDian || '',
         };
     };
 
@@ -182,6 +206,10 @@ async function enviar(venta, cfg, ctx, { repo, soap, dian, ahora = () => new Dat
                 }
                 aviso = rut.aviso || '';
                 if (rut.venta.comprador.tipoDoc === 'N') registro.resumen.conRut = true;
+                if (rut.venta.comprador.nombresDian) {
+                    const n = rut.venta.comprador.nombresDian;
+                    registro.resumen.nombreDian = [n.nombres, n.apellido1, n.apellido2].filter(Boolean).join(' ');
+                }
                 const lineasTercero = documentos.terceroLineas(rut.venta, cfg, t.tercero, municipios, segmentos);
                 const clasif = documentos.clasificacionCliente(venta, cfg.tercero, segmentos);
                 pasos.push(`Clasificación: ${clasif.filter(([p]) => p === 'D01' || p === 'D02').map((c) => c.join(' ')).join(', ')}`);
@@ -190,6 +218,7 @@ async function enviar(venta, cfg, ctx, { repo, soap, dian, ahora = () => new Dat
                 pasos.push(`Crear tercero: ${r.mensaje}`);
                 if (!r.exito) return terminar(r.codigo === '1' ? 'rechazado' : 'error', 'SIESA no aceptó el registro del comprador como cliente. Avise al administrador.', r.respuesta);
                 registro.terceroCreado = true;
+                if (venta.comprador.juridica) aviso = [aviso, AVISO_EMPRESA_CREADA].filter(Boolean).join(' ');
             }
         }
 
@@ -221,4 +250,4 @@ async function enviar(venta, cfg, ctx, { repo, soap, dian, ahora = () => new Dat
     }
 }
 
-module.exports = { vistaPrevia, enviar, ESTADO_UI, validarRut };
+module.exports = { vistaPrevia, enviar, ESTADO_UI, validarRut, nombreIncompleto };

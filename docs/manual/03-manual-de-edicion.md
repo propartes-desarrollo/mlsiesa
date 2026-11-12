@@ -89,12 +89,12 @@ Pruebas** con el script de la sección 13.
 | `rutas/usuarios.js` | Listar, crear y editar usuarios (solo admin). | 83 |
 | `middleware/autenticacion.js` | Verifica la sesión (6) y el rol (24). | 34 |
 | `servicios/excelMl.js` | Lee el Excel de Mercado Libre y arma las ventas con avisos y bloqueos. | 311 |
-| `servicios/procesoVentas.js` | Revisión de cada venta (36) y envío completo a SIESA (119). | 224 |
-| `servicios/siesa/documentos.js` | Arma el pedido (96) y el cliente (229) en el formato de SIESA. | 376 |
+| `servicios/procesoVentas.js` | Revisión de cada venta (53) y envío completo a SIESA (142). | 253 |
+| `servicios/siesa/documentos.js` | Arma el pedido (96) y el cliente (232) en el formato de SIESA. | 379 |
 | `servicios/siesa/layouts.js` | Estructura campo por campo de cada registro de SIESA. | 127 |
-| `servicios/siesa/plano.js` | Formato de cada campo (mayúsculas, ceros, decimales) y envoltura XML. | 104 |
+| `servicios/siesa/plano.js` | Formato de cada campo (mayúsculas, ceros, decimales) y envoltura XML. | 106 |
 | `servicios/siesa/clienteSoap.js` | Comunicación con SIESA: importar (63) y consultas de tercero (110), ítem (128) y pedido (179). | 195 |
-| `servicios/dian.js` | Consulta del RUT en la DIAN. | 82 |
+| `servicios/dian.js` | Consulta del RUT en la DIAN y nombres y apellidos de la persona. | 87 |
 | `servicios/reintentosDian.js` | Reintento automático de las ventas "Esperando DIAN". | 55 |
 | `servicios/envios.js` | Guardado y consulta de los envíos (historial). | 129 |
 | `servicios/parametros.js` | **Todos los valores de Configuración** con su valor original (15-126) y la conexión SIESA (143-154). | 178 |
@@ -115,7 +115,7 @@ Pruebas** con el script de la sección 13.
 | `paginas/Historial.jsx` | **Historial de envíos**: filtros, tabla y detalle del envío. | 246 |
 | `paginas/Parametros.jsx` | **Configuración**: pestañas, municipios y conexión. | 212 |
 | `paginas/Usuarios.jsx` | **Usuarios**. | 96 |
-| `utilidades/formato.js` | Pesos, fechas, dígito de verificación, **estados y sus colores**, textos cortos del Historial. | 71 |
+| `utilidades/formato.js` | Pesos, fechas, dígito de verificación, **estados y sus colores**, textos cortos del Historial. | 75 |
 | `api/indice.js` | Todas las llamadas de las pantallas al servidor. | 80 |
 | `tema.js` | Colores y tipografía. | 20 |
 | `principal.jsx` | Arranque de las pantallas (idioma del calendario). | 27 |
@@ -142,11 +142,11 @@ Seguir este recorrido ayuda a saber dónde está cada regla.
 | 1. Subir el Excel | La pantalla envía el archivo. | `frontend/src/paginas/CargarVentas.jsx:32-42` |
 | 2. Recibirlo | Valida que sea `.xlsx` de hasta 10 MB y lo guarda como "cargue". | `backend/src/rutas/ventasMl.js:26-32`, `:60-74` |
 | 3. Leer el Excel | Ubica las columnas por nombre, agrupa paquetes y arma cada venta con sus avisos y bloqueos. | `backend/src/servicios/excelMl.js:178-218` y `:222-307` |
-| 4. Revisar cada venta | Aplica bloqueos y avisos con la configuración **actual**. | `backend/src/servicios/procesoVentas.js:36-90` |
+| 4. Revisar cada venta | Aplica bloqueos y avisos con la configuración **actual**. | `backend/src/servicios/procesoVentas.js:53-113` |
 | 5. Mostrar el archivo | Tabla, resumen y detalle. | `frontend/src/paginas/Cargue.jsx` |
 | 6. Enviar | La pantalla envía las ventas una por una. | `frontend/src/paginas/Cargue.jsx:166-185` |
-| 7. Proceso de envío | Bloqueo anti-duplicado, pedido ya existente, productos, cliente, DIAN, pedido, número. | `backend/src/servicios/procesoVentas.js:119-222` |
-| 8. Armar documentos | Pedido y cliente en el formato de SIESA. | `backend/src/servicios/siesa/documentos.js:96-168` y `:229-308` |
+| 7. Proceso de envío | Bloqueo anti-duplicado, pedido ya existente, productos, cliente, DIAN, pedido, número. | `backend/src/servicios/procesoVentas.js:142-251` |
+| 8. Armar documentos | Pedido y cliente en el formato de SIESA. | `backend/src/servicios/siesa/documentos.js:96-168` y `:232-311` |
 | 9. Hablar con SIESA | Importar y consultar. | `backend/src/servicios/siesa/clienteSoap.js` |
 | 10. Guardar el resultado | Estado, detalle, documentos y pedido. | `backend/src/servicios/envios.js:42-56` |
 | 11. Historial | Lista con filtros y detalle. | `backend/src/servicios/envios.js:94-113`, `frontend/src/paginas/Historial.jsx` |
@@ -390,12 +390,12 @@ Para **agregar una forma de entrega nueva** (por ejemplo una tercera bodega): ag
 | Precio distinto de lo cobrado | Aviso | `excelMl.js:234-236` |
 | Sin documento / tipo no reconocido | Bloqueo / Aviso | `excelMl.js:261-266` |
 | Fecha no reconocida | Bloqueo | `excelMl.js:270` |
-| Forma de entrega | Bloqueo | `excelMl.js:63-72`, aplicado en `procesoVentas.js:39-42` |
-| Ciudad no registrada | Aviso | `backend/src/servicios/procesoVentas.js:46-48` |
-| Comprador empresa | Aviso | `procesoVentas.js:49` |
-| Archivo de versión anterior | Bloqueo | `procesoVentas.js:51-52` |
-| Sin bodega configurada | Bloqueo | `procesoVentas.js:53-55` |
-| Total con IVA distinto | Aviso | `procesoVentas.js:62-68` |
+| Forma de entrega | Bloqueo | `excelMl.js:63-72`, aplicado en `procesoVentas.js:56-59` |
+| Ciudad no registrada | Aviso | `backend/src/servicios/procesoVentas.js:63-65` |
+| Comprador empresa | Aviso | `procesoVentas.js:66` |
+| Archivo de versión anterior | Bloqueo | `procesoVentas.js:74-75` |
+| Sin bodega configurada | Bloqueo | `procesoVentas.js:76-78` |
+| Total con IVA distinto | Aviso | `procesoVentas.js:85-91` |
 
 **Diferencia importante:** las reglas de `excelMl.js` se evalúan **al cargar** el archivo (un archivo ya
 cargado conserva el resultado). Las de `procesoVentas.js` se evalúan **cada vez que se abre** el archivo,
@@ -409,7 +409,7 @@ Cambie `alertas.push(` por `bloqueos.push(` (o al revés) en la línea de la tab
 
 | | |
 |---|---|
-| **Archivo** | `backend/src/servicios/procesoVentas.js`, línea 66. Buscar: `> detalle.length * 2` |
+| **Archivo** | `backend/src/servicios/procesoVentas.js`, línea 89. Buscar: `> detalle.length * 2` |
 | **Regla actual** | Avisa si la diferencia supera 2 pesos por línea. |
 
 ### 7.4 Cambiar el redondeo del precio sin IVA
@@ -417,13 +417,13 @@ Cambie `alertas.push(` por `bloqueos.push(` (o al revés) en la línea de la tab
 | | |
 |---|---|
 | **Archivo** | `backend/src/servicios/siesa/documentos.js`, línea 25. Buscar: `const neto =` |
-| **Regla actual** | Precio con IVA ÷ (1 + IVA), subido al peso entero siguiente (SIESA rechaza fracciones). |
+| **Regla actual** | Precio con IVA ÷ (1 + IVA), redondeado a centavos (función `centavos`, `backend/src/servicios/siesa/plano.js:92-94`). SIESA acepta 2 decimales y rechaza más. Con centavos, el total con IVA en SIESA queda igual a lo cobrado: 4 × 38.319,33 + IVA = $182.400 (probado en Pruebas, PML-3289). Subirlo al peso entero dejaba hasta unos pesos de más (PML-3348: $182.403). |
 
 ### 7.5 Agregar una regla nueva
 
 - Si depende solo del Excel: agréguela en `construirVenta`, `backend/src/servicios/excelMl.js:222-307`.
 - Si depende de la configuración o debe aplicar a archivos ya cargados: agréguela en `vistaPrevia`,
-  `backend/src/servicios/procesoVentas.js:36-90`.
+  `backend/src/servicios/procesoVentas.js:53-113`.
 - Agregue una prueba en `backend/pruebas/ventas.test.js` (sección 15).
 
 ### 7.6 Mensajes del resultado del envío
@@ -432,17 +432,18 @@ Todos en `backend/src/servicios/procesoVentas.js`:
 
 | Mensaje | Línea |
 |---|---|
-| Ya estaba en SIESA como pedido… | 162 |
-| El producto … no existe en SIESA / Sin datos del producto | 105, 111 |
-| El comprador está inactivo en SIESA… | 173 |
-| El comprador no está registrado en SIESA… | 176 |
-| La DIAN no respondió para validar el RUT… | 181 |
-| Aviso "no se pudo validar el RUT" | 33 |
-| SIESA no aceptó el registro del comprador… | 191 |
-| SIESA no aceptó el pedido… | 198 |
-| Pedido … creado en SIESA. | 205, 208 |
-| SIESA no respondió a tiempo… | 218 |
-| No fue posible comunicarse con SIESA… | 220 |
+| Ya estaba en SIESA como pedido… | 186 |
+| El producto … no existe en SIESA / Sin datos del producto | 128, 134 |
+| El comprador está inactivo en SIESA… | 197 |
+| El comprador no está registrado en SIESA… | 200 |
+| La DIAN no respondió para validar el RUT… | 205 |
+| Aviso "no se pudo validar el RUT" | 36 |
+| Aviso "Cliente empresa creado con los datos tributarios estándar…" | 16 |
+| SIESA no aceptó el registro del comprador… | 219 |
+| SIESA no aceptó el pedido… | 227 |
+| Pedido … creado en SIESA. | 234, 237 |
+| SIESA no respondió a tiempo… | 247 |
+| No fue posible comunicarse con SIESA… | 249 |
 
 Si cambia uno, revise su frase corta en `frontend/src/utilidades/formato.js:50-65`.
 
@@ -495,7 +496,7 @@ Todo en `backend/src/servicios/siesa/documentos.js`, función `pedidoLineas` (l�
 | | |
 |---|---|
 | **Líneas** | 84-89. Buscar: `function barrioBogota` |
-| **Regla actual** | Si el departamento es Bogotá, el barrio es la columna "Ciudad" del Excel (Mercado Libre pone allí la localidad). Se usa en el pedido (línea 128) y en el cliente (líneas 199-204). |
+| **Regla actual** | Si el departamento es Bogotá, el barrio es la columna "Ciudad" del Excel (Mercado Libre pone allí la localidad). Se usa en el pedido (línea 128) y en el cliente (líneas 202-207). |
 
 ### 8.6 Cambiar la descripción de la línea del flete
 
@@ -525,11 +526,11 @@ Todo en `backend/src/servicios/siesa/documentos.js`.
 
 | Registro | Contenido | Líneas |
 |---|---|---|
-| 0200 | Tercero: documento, dígito de verificación, tipo, nombres, dirección, ciudad, barrio | 238-253 |
-| 0201 | Cliente: sucursal, vendedor, condición, lista, calificación, margen, bloqueos, nota, centro de operación | 254-270 |
-| 0207 | Clasificación (un registro por plan) | 272-279 |
-| 0753 | Facturación electrónica y correo | 281-291 |
-| 0046 / 0047 | Impuestos y retenciones | 293-304 |
+| 0200 | Tercero: documento, dígito de verificación, tipo, nombres, dirección, ciudad, barrio | 241-256 |
+| 0201 | Cliente: sucursal, vendedor, condición, lista, calificación, margen, bloqueos, nota, centro de operación | 257-273 |
+| 0207 | Clasificación (un registro por plan) | 275-282 |
+| 0753 | Facturación electrónica y correo | 284-294 |
+| 0046 / 0047 | Impuestos y retenciones | 296-307 |
 
 ### 9.2 Cómo se separan nombres y apellidos
 
@@ -550,23 +551,23 @@ Todo en `backend/src/servicios/siesa/documentos.js`.
 
 | | |
 |---|---|
-| **Tipo de identificación** | Línea 214. Buscar: `tipoIdent: juridica ? 'N'` |
-| **Persona natural con RUT** | `backend/src/servicios/procesoVentas.js:27` cambia el tipo a `N` cuando la DIAN confirma el RUT. |
+| **Tipo de identificación** | Línea 217. Buscar: `tipoIdent: juridica ? 'N'` |
+| **Persona natural con RUT** | `backend/src/servicios/procesoVentas.js:30` cambia el tipo a `N` cuando la DIAN confirma el RUT. |
 
 ### 9.5 Regla de división y segmento (Automotriz, Motos, Bicicletas)
 
 | | |
 |---|---|
-| **Líneas** | 315-337. Buscar: `function clasificacionCliente` |
+| **Líneas** | 318-340. Buscar: `function clasificacionCliente` |
 | **Regla actual** | Suma el valor (cantidad × precio) de los productos de cada grupo; gana el de mayor valor. |
-| **Para decidir por unidades** | Línea 328: cambie `it.cantidad * it.precioIva` por `it.cantidad`. |
+| **Para decidir por unidades** | Línea 331: cambie `it.cantidad * it.precioIva` por `it.cantidad`. |
 | **Los códigos** | Se configuran en Configuración → Avanzado (no requiere código). |
 
 ### 9.6 Facturación electrónica
 
 | | |
 |---|---|
-| **Líneas** | 348-362. Buscar: `function entidadesFe` |
+| **Líneas** | 351-365. Buscar: `function entidadesFe` |
 | **Qué contiene** | Grupo, entidad, atributo y maestro de SIESA de cada dato (régimen, obligación, detalle tributario 1 y 2, correo). Los **valores** están en Configuración. |
 
 ---
@@ -713,9 +714,9 @@ recuerde que Pruebas se sobrescribe a las 19:00.
 
 | Qué | Archivo y líneas |
 |---|---|
-| Consulta a la página de la DIAN | `backend/src/servicios/dian.js:56-80` |
-| Cómo se lee la respuesta (empresa: razón social; persona: nombres y apellidos; sin RUT: "no es válido") | `dian.js:28-40` |
-| Cuándo se consulta y qué se hace con la respuesta | `backend/src/servicios/procesoVentas.js:18-34` |
+| Consulta a la página de la DIAN | `backend/src/servicios/dian.js:61-85` |
+| Cómo se lee la respuesta (empresa: razón social; persona: nombres y apellidos; sin RUT: "no es válido") | `dian.js:29-45` |
+| Cuándo se consulta y qué se hace con la respuesta | `backend/src/servicios/procesoVentas.js:19-37` |
 | Reintento automático | `backend/src/servicios/reintentosDian.js` (revisa cada minuto: línea 19) |
 | Estado `espera_dian` en la base | `db/migraciones/0003_espera_dian.sql` |
 
@@ -733,13 +734,13 @@ no se pudo interpretar"* o *"La página de la DIAN cambió o está en mantenimie
 
 | | |
 |---|---|
-| **Archivo** | `backend/src/servicios/dian.js`, línea 56. Buscar: `timeoutMs = 20000` (20 segundos). |
+| **Archivo** | `backend/src/servicios/dian.js`, línea 61. Buscar: `timeoutMs = 20000` (20 segundos). |
 
 ### 14.4 Validar también a extranjeros o empresas
 
 | | |
 |---|---|
-| **Archivo** | `backend/src/servicios/procesoVentas.js`, línea 24. Buscar: `(c.tipoDoc \|\| 'C') !== 'C'` |
+| **Archivo** | `backend/src/servicios/procesoVentas.js`, línea 25. Buscar: `(c.tipoDoc \|\| 'C') !== 'C'` |
 | **Regla actual** | Solo personas naturales con cédula (`C`). |
 
 ---

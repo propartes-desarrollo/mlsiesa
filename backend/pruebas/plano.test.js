@@ -66,6 +66,7 @@ test('primitivas de campo', () => {
     assert.equal(P.a('Tienda.Virtual@Propartes.com', 30), 'tienda.virtual@propartes.com  ');
     assert.equal(P.a('línea\ncon salto', 16), 'LINEA CON SALTO ');
     assert.equal(P.a('Peña 😀', 8), 'PENA    ');
-    assert.equal(P.ceilPesos(28600 / 1.19), 24034);
-    assert.equal(P.ceilPesos(119000 / 1.19), 100000);   // sin falsos redondeos por coma flotante
+    assert.equal(P.centavos(28600 / 1.19), 24033.61);
+    assert.equal(P.centavos(45600 / 1.19), 38319.33);   // PML-3348: 4 x 38319.33 + IVA = 182400
+    assert.equal(P.centavos(119000 / 1.19), 100000);   // sin falsos redondeos por coma flotante
 });

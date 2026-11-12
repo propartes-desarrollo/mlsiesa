@@ -89,7 +89,9 @@ function envolver(lineas, { conexion, cia, usuario, clave }) {
 const largo = (layout) => layout.reduce((s, [, t]) => s + t, 0);
 
 // SIESA rechaza precios con fracción de centavo: se sube a peso entero.
-const ceilPesos = (v) => Math.ceil(Number(Number(v).toFixed(6)));
+// Redondeo a centavos. SIESA acepta 2 decimales en el precio unitario y rechaza más
+// (probado en Pruebas: 38319.33 importa; 355210.0840 se rechaza).
+const centavos = (v) => Math.round(Number(Number(v).toFixed(6)) * 100) / 100;
 
 // Extrae el valor crudo de un campo (pruebas y diagnóstico).
 function campo(layout, linea, nombre) {
@@ -101,4 +103,4 @@ function campo(layout, linea, nombre) {
     throw new Error(`Campo inexistente: ${nombre}`);
 }
 
-module.exports = { ascii, n, a, d, registro, control, envolver, escaparXml, largo, ceilPesos, campo };
+module.exports = { ascii, n, a, d, registro, control, envolver, escaparXml, largo, centavos, campo };

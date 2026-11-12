@@ -124,10 +124,10 @@ describe('documentos', () => {
         assert.equal(campo(L.L431, lineas[3], 'f431_num_dias_entrega'), '001');
         assert.equal(campo(L.L431, lineas[3], 'f431_id_ccosto_movto').trim(), '5059');
         assert.equal(campo(L.L431, lineas[2], 'f431_referencia_item').trim(), 'LM21119');
-        assert.equal(campo(L.L431, lineas[2], 'f431_precio_unitario'), '000000000024034.0000');
+        assert.equal(campo(L.L431, lineas[2], 'f431_precio_unitario'), '000000000024033.6100');   // 28.600 / 1,19 en centavos
         assert.equal(campo(L.L431, lineas[2], 'f431_ind_backorder'), '5');
         assert.equal(campo(L.L431, lineas[3], 'f431_referencia_item').trim(), 'FLETE');
-        assert.equal(campo(L.L431, lineas[3], 'f431_precio_unitario'), '000000000013026.0000');
+        assert.equal(campo(L.L431, lineas[3], 'f431_precio_unitario'), '000000000013025.2100');   // 15.500 / 1,19
         assert.equal(Number(lineas.at(-1).slice(0, 7)), lineas.length);
     });
 
@@ -247,6 +247,22 @@ describe('documentos', () => {
         assert.equal(c.length, 11);
     });
 
+    test('alerta de nombre incompleto y aviso de empresa', async () => {
+        const v = (await excelMl.leer(R0928))[0];
+        const alertas = (nombre, juridica = false) => proceso.vistaPrevia({ ...v, comprador: { ...v.comprador, nombre, juridica, tipoDoc: juridica ? 'N' : 'C' } }, cfgBase()).alertas;
+        const incompleto = (n) => alertas(n).find((a) => a.startsWith('Datos del comprador posiblemente incompletos:'));
+        assert.match(incompleto('Wilson S'), /hay que editar el Tercero antes de facturar/);
+        for (const n of ['Wilson Suarez', 'Wilson']) assert.ok(incompleto(n), n);
+        assert.equal(incompleto('Wilson Andres Suarez Mora'), undefined);
+        assert.equal(incompleto('Wilson Suarez Mora'), undefined);
+        const motivo = (nombres, apellido1, apellido2 = '') => proceso.nombreIncompleto({ nombres, apellido1, apellido2 });
+        assert.match(motivo('Wilson', 'S'), /iniciales/);
+        assert.equal(motivo('Wilson', 'Suarez'), 'un solo apellido');
+        assert.equal(motivo('Wilson', ''), 'sin apellidos');
+        assert.ok(alertas('Empresa SAS', true).some((a) => a.startsWith('Comprador empresa (NIT):') && /antes de facturar/.test(a)));
+        assert.ok(!alertas('Empresa SAS', true).some((a) => a.startsWith('Datos del comprador')));
+    });
+
     test('clases de impuesto y retención del parámetro', () => {
         assert.deepEqual(documentos.clasesTributarias(['1:1', ' 023 : 01 : 3001 ', 'ABC:1', 'incompleto']), [
             { clase: '001', valor: '01', llave: '' },
@@ -320,7 +336,7 @@ function entorno({ tercero = 'activo', pedido = '0', terceroImport = '0', item =
     const dian = {
         async consultarRut(doc) {
             llamadas.push(['dian', doc]);
-            return { estado: simulado.rut, nombre: simulado.rut === 'con_rut' ? 'X' : '', mensaje: '' };
+            return { estado: simulado.rut, nombre: simulado.rut === 'con_rut' ? 'X' : '', partes: simulado.partesDian || null, mensaje: '' };
         },
     };
     let reloj = new Date('2026-10-16T15:00:00Z');
@@ -461,6 +477,24 @@ test('persona natural con RUT: se registra con NIT (tipo N), sigue siendo person
         assert.equal(e.filas[venta.numero].resumen.conRut, true);
     });
 
+    test('persona natural con RUT: nombres y apellidos salen de la DIAN', async () => {
+        const e = entorno({ tercero: 'no_existe', rut: 'con_rut' });
+        e.simulado.partesDian = { nombres: 'WILSON ANDRES', apellido1: 'SUAREZ', apellido2: 'MORA' };
+        const r = await proceso.enviar({ ...venta, comprador: { ...venta.comprador, nombre: 'Wilson S' } }, e.cfg, ctx, e.deps);
+        assert.equal(r.estado, 'enviada');
+        assert.equal(r.nombreDian, 'WILSON ANDRES SUAREZ MORA');
+        const t = e.lineasTercero[0][1];
+        assert.deepEqual(['F200_NOMBRES', 'F200_APELLIDO1', 'F200_APELLIDO2', 'F200_NOMBRE_EST'].map((c) => campo(L.L200, t, c).trim()),
+            ['WILSON ANDRES', 'SUAREZ', 'MORA', 'WILSON ANDRES SUAREZ MORA']);
+    });
+
+    test('empresa nueva: el resultado avisa revisar sus datos tributarios antes de facturar', async () => {
+        const e = entorno({ tercero: 'no_existe' });
+        const empresa = { ...venta, comprador: { ...venta.comprador, documento: '900123456', tipoDoc: 'N', juridica: true, nombre: 'Empresa SAS' } };
+        const r = await proceso.enviar(empresa, e.cfg, ctx, e.deps);
+        assert.match(r.mensaje, /Cliente empresa creado con los datos tributarios estándar\. Debe revisarlos en SIESA antes de facturar\./);
+    });
+
     test('persona natural sin RUT: se registra con cédula', async () => {
         const e = entorno({ tercero: 'no_existe' });
         await proceso.enviar(venta, e.cfg, ctx, e.deps);
@@ -513,11 +547,11 @@ test('persona natural con RUT: se registra con NIT (tipo N), sigue siendo person
     test('respuesta de la DIAN', () => {
         const F = 'vistaSelPublicacionesExterna:formSelPublicacionesExterna';
         assert.deepEqual(dianReal.interpretar(`<td>Raz&oacute;n Social</td><td><span id="${F}:razonSocial">PEREZ  GOMEZ JUAN</span></td>`),
-            { estado: 'con_rut', nombre: 'PEREZ GOMEZ JUAN', mensaje: '' });
+            { estado: 'con_rut', nombre: 'PEREZ GOMEZ JUAN', partes: null, mensaje: '' });
         // Persona natural: nombres y apellidos por separado (datos ficticios).
         const span = (id, v) => `<span id="${F}:${id}">${v}</span>`;
         assert.deepEqual(dianReal.interpretar(span('primerApellido', 'PEREZ') + span('segundoApellido', 'GOMEZ') + span('primerNombre', 'JUAN') + span('otrosNombres', 'CARLOS')),
-            { estado: 'con_rut', nombre: 'JUAN CARLOS PEREZ GOMEZ', mensaje: '' });
+            { estado: 'con_rut', nombre: 'JUAN CARLOS PEREZ GOMEZ', partes: { nombres: 'JUAN CARLOS', apellido1: 'PEREZ', apellido2: 'GOMEZ' }, mensaje: '' });
         assert.equal(dianReal.interpretar(span('primerApellido', 'PEREZ') + span('primerNombre', 'JUAN') + span('segundoApellido', '') + span('otrosNombres', '')).nombre, 'JUAN PEREZ');
         assert.equal(dianReal.interpretar('Error NIT Inv&aacute;lido.El NIT 999000008 no es v&aacute;lido. Verifique que el NIT se encuentre registrado en el RUT.').estado, 'sin_rut');
         assert.equal(dianReal.interpretar('<html>En mantenimiento</html>').estado, 'desconocido');

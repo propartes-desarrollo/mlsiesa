@@ -42,12 +42,12 @@ busque en el archivo la **clave** del valor (por ejemplo `'pedido.co'`).
 | Nombre en pantalla | Clave | Valor original | Qué controla | Definido en | Actúa en |
 |---|---|---|---|---|---|
 | Envío a SIESA | `envio.activo` | Apagado | Si está apagado, se puede cargar y revisar, pero no enviar. También detiene el reintento automático de la DIAN. | `parametros.js:17` | `rutas/ventasMl.js:129`, `servicios/reintentosDian.js:30` |
-| Revisar el comprador antes de enviar | `envio.validar_tercero` | Encendido | Consulta en SIESA si el comprador ya es cliente antes de crear el pedido. Apagado, nunca se crean clientes nuevos. | `parametros.js:19` | `servicios/procesoVentas.js:170` |
-| Registrar compradores nuevos | `envio.crear_tercero` | Apagado | Si el comprador no existe en SIESA, lo registra como cliente. Apagado, la venta queda "Comprador no registrado". | `parametros.js:21` | `servicios/procesoVentas.js:175` |
-| Validar el RUT en la DIAN | `envio.validar_rut` | Encendido | Consulta en la DIAN si la persona natural con cédula tiene RUT; si lo tiene, la registra con NIT. | `parametros.js:24` | `servicios/procesoVentas.js:24` |
-| Página de consulta del RUT en la DIAN | `envio.rut_url` | `https://muisca.dian.gov.co/WebGestionmasiva/DefSelPublicacionesExterna.faces` | Dirección de la página de la DIAN. Cámbiela solo si la DIAN la mueve y el formulario es el mismo. | `parametros.js:26` | `servicios/procesoVentas.js:25`, `servicios/dian.js:56` |
-| DIAN: minutos entre reintentos | `envio.rut_reintento_min` | 10 | Cada cuánto se reintenta una venta "Esperando DIAN". | `parametros.js:28` | `servicios/procesoVentas.js:31` |
-| DIAN: espera máxima (minutos) | `envio.rut_espera_max_min` | 60 | Pasado este tiempo sin respuesta de la DIAN, se registra con cédula y queda el aviso. | `parametros.js:30` | `servicios/procesoVentas.js:30` |
+| Revisar el comprador antes de enviar | `envio.validar_tercero` | Encendido | Consulta en SIESA si el comprador ya es cliente antes de crear el pedido. Apagado, nunca se crean clientes nuevos. | `parametros.js:19` | `servicios/procesoVentas.js:194` |
+| Registrar compradores nuevos | `envio.crear_tercero` | Apagado | Si el comprador no existe en SIESA, lo registra como cliente. Apagado, la venta queda "Comprador no registrado". | `parametros.js:21` | `servicios/procesoVentas.js:199` |
+| Validar el RUT en la DIAN | `envio.validar_rut` | Encendido | Consulta en la DIAN si la persona natural con cédula tiene RUT; si lo tiene, la registra con NIT. | `parametros.js:24` | `servicios/procesoVentas.js:25` |
+| Página de consulta del RUT en la DIAN | `envio.rut_url` | `https://muisca.dian.gov.co/WebGestionmasiva/DefSelPublicacionesExterna.faces` | Dirección de la página de la DIAN. Cámbiela solo si la DIAN la mueve y el formulario es el mismo. | `parametros.js:26` | `servicios/procesoVentas.js:26`, `servicios/dian.js:61` |
+| DIAN: minutos entre reintentos | `envio.rut_reintento_min` | 10 | Cada cuánto se reintenta una venta "Esperando DIAN". | `parametros.js:28` | `servicios/procesoVentas.js:34` |
+| DIAN: espera máxima (minutos) | `envio.rut_espera_max_min` | 60 | Pasado este tiempo sin respuesta de la DIAN, se registra con cédula y queda el aviso. | `parametros.js:30` | `servicios/procesoVentas.js:33` |
 | Mostrar información técnica | `envio.ver_tecnico` | Encendido | Muestra a los administradores los archivos técnicos y la respuesta de SIESA. | `parametros.js:33` | `rutas/parametros.js:33`, `frontend/.../Cargue.jsx:125`, `frontend/.../Historial.jsx:133` |
 
 ## Pestaña "Pedido"
@@ -57,14 +57,14 @@ busque en el archivo la **clave** del valor (por ejemplo `'pedido.co'`).
 | Centro de operación | `pedido.co` | 021 | Centro de operación del pedido. | `parametros.js:37` | `siesa/documentos.js:112`, `:117`, `:140` |
 | Tipo de documento | `pedido.tipo_docto` | PML | Tipo de documento de los pedidos de ML. **También lo usa la consulta `CONSULTA_PEDIDO_ML`** (ver nota). | `parametros.js:38` | `siesa/documentos.js:112`, `:140` |
 | Vendedor | `pedido.vendedor` | VEN0600 | Vendedor del pedido (MERCADO LIBRE). | `parametros.js:39` | `siesa/documentos.js:124` |
-| Lista de precios | `pedido.lista_precio` | L04 | Lista de precios del pedido y del cliente nuevo. | `parametros.js:40` | `siesa/documentos.js:145`, `:261` |
+| Lista de precios | `pedido.lista_precio` | L04 | Lista de precios del pedido y del cliente nuevo. | `parametros.js:40` | `siesa/documentos.js:145`, `:264` |
 | Condición de pago | `pedido.cond_pago` | C08 | Condición de pago del pedido. | `parametros.js:41` | `siesa/documentos.js:123` |
-| Tipo de cliente | `pedido.tipo_cli` | 6000 | Tipo de cliente del pedido y del cliente nuevo (Clientes Ventas Virtuales). | `parametros.js:42` | `siesa/documentos.js:117`, `:260` |
+| Tipo de cliente | `pedido.tipo_cli` | 6000 | Tipo de cliente del pedido y del cliente nuevo (Clientes Ventas Virtuales). | `parametros.js:42` | `siesa/documentos.js:117`, `:263` |
 | Bodega para ventas Full | `pedido.bodega_full` | BC207 | Bodega de las ventas *Mercado Envíos Full*. | `parametros.js:43` | `siesa/documentos.js:36` |
 | Bodega para ventas Colecta | `pedido.bodega_colecta` | BP150 | Bodega de las ventas *Colecta*. | `parametros.js:44` | `siesa/documentos.js:37` |
 | Referencia del flete | `pedido.ref_flete` | FLETE | Producto con el que se registra el envío pagado por el comprador. Vacío = el envío no se registra. | `parametros.js:45` | `siesa/documentos.js:50-54` |
 | Días de entrega | `pedido.dias_entrega` | 1 | Fecha de entrega = fecha de la venta + estos días. | `parametros.js:47` | `siesa/documentos.js:101` |
-| IVA de los productos (%) | `pedido.iva_pct` | 19 | Con este porcentaje se pasa el precio de ML (con IVA) a precio sin IVA. | `parametros.js:48` | `siesa/documentos.js:47`, `procesoVentas.js:64` |
+| IVA de los productos (%) | `pedido.iva_pct` | 19 | Con este porcentaje se pasa el precio de ML (con IVA) a precio sin IVA. | `parametros.js:48` | `siesa/documentos.js:47`, `procesoVentas.js:87` |
 | IVA del envío (%) | `pedido.iva_flete_pct` | 19 | Igual, para el flete. | `parametros.js:49` | `siesa/documentos.js:53` |
 
 > **Nota sobre el tipo de documento.** La consulta que busca los pedidos en SIESA
@@ -75,21 +75,21 @@ busque en el archivo la **clave** del valor (por ejemplo `'pedido.co'`).
 
 | Nombre en pantalla | Clave | Valor original | Qué controla | Definido en | Actúa en |
 |---|---|---|---|---|---|
-| Correo de los clientes nuevos | `tercero.email_respaldo` | tienda.virtual@propartes.com | ML no entrega el correo del comprador: se usa este, también para la factura electrónica y en la dirección de envío del pedido. | `parametros.js:76` | `siesa/documentos.js:130`, `:220`, `:360` |
-| Teléfono de los clientes nuevos | `tercero.telefono_respaldo` | (vacío) | Teléfono del cliente y del envío. Vacío = sin teléfono. | `parametros.js:78` | `siesa/documentos.js:129`, `:220` |
-| Vendedor y cobrador | `tercero.vendedor` | 0600 | Vendedor y cobrador del cliente nuevo. | `parametros.js:79` | `siesa/documentos.js:259`, `:268` |
-| Condición de pago | `tercero.cond_pago` | C08 | Condición de pago del cliente nuevo. | `parametros.js:80` | `siesa/documentos.js:260` |
-| Centro de operación de ventas | `tercero.co_movto` | 040 | Centro de operación de "Parámetros default movimiento de ventas" del cliente. | `parametros.js:81` | `siesa/documentos.js:269` |
-| Nota del cliente nuevo | `tercero.notas` | Creado en Mercadolibre | Observación del cliente en SIESA (llega en mayúsculas). | `parametros.js:82` | `siesa/documentos.js:268` |
-| Margen máximo (%) | `tercero.porc_max_margen` | 100 | Margen máximo del cliente (llega como 0100.00). | `parametros.js:84` | `siesa/documentos.js:262` |
-| Factura electrónica: régimen | `tercero.fe_regimen_natural` | 49 | Régimen de la persona natural (49 = No responsable de IVA). | `parametros.js:85` | `siesa/documentos.js:355` |
-| Factura electrónica: obligación | `tercero.fe_obligacion_natural` | R-99-PN | Obligación de la persona natural. | `parametros.js:86` | `siesa/documentos.js:356` |
-| Factura electrónica: detalle tributario 1 | `tercero.fe_detalle1_natural` | ZZ | Detalle tributario 1 de la persona natural (ZZ = No aplica). | `parametros.js:87` | `siesa/documentos.js:357` |
-| Factura electrónica: detalle tributario 2 | `tercero.fe_detalle2_natural` | (vacío) | Vacío = no se envía. | `parametros.js:88` | `siesa/documentos.js:358` |
-| Factura electrónica empresa: régimen | `tercero.fe_regimen_juridica` | 48 | Régimen de la empresa (48 = Responsable de IVA). | `parametros.js:89` | `siesa/documentos.js:355` |
-| Factura electrónica empresa: obligación | `tercero.fe_obligacion_juridica` | R-99-PN | Obligación de la empresa. | `parametros.js:90` | `siesa/documentos.js:356` |
-| Factura electrónica empresa: detalle tributario 1 | `tercero.fe_detalle1_juridica` | 01 | Detalle tributario 1 de la empresa (01 = IVA). | `parametros.js:91` | `siesa/documentos.js:357` |
-| Factura electrónica empresa: detalle tributario 2 | `tercero.fe_detalle2_juridica` | (vacío) | Vacío = no se envía. | `parametros.js:92` | `siesa/documentos.js:358` |
+| Correo de los clientes nuevos | `tercero.email_respaldo` | tienda.virtual@propartes.com | ML no entrega el correo del comprador: se usa este, también para la factura electrónica y en la dirección de envío del pedido. | `parametros.js:76` | `siesa/documentos.js:130`, `:223`, `:363` |
+| Teléfono de los clientes nuevos | `tercero.telefono_respaldo` | (vacío) | Teléfono del cliente y del envío. Vacío = sin teléfono. | `parametros.js:78` | `siesa/documentos.js:129`, `:223` |
+| Vendedor y cobrador | `tercero.vendedor` | 0600 | Vendedor y cobrador del cliente nuevo. | `parametros.js:79` | `siesa/documentos.js:262`, `:271` |
+| Condición de pago | `tercero.cond_pago` | C08 | Condición de pago del cliente nuevo. | `parametros.js:80` | `siesa/documentos.js:263` |
+| Centro de operación de ventas | `tercero.co_movto` | 040 | Centro de operación de "Parámetros default movimiento de ventas" del cliente. | `parametros.js:81` | `siesa/documentos.js:272` |
+| Nota del cliente nuevo | `tercero.notas` | Creado en Mercadolibre | Observación del cliente en SIESA (llega en mayúsculas). | `parametros.js:82` | `siesa/documentos.js:271` |
+| Margen máximo (%) | `tercero.porc_max_margen` | 100 | Margen máximo del cliente (llega como 0100.00). | `parametros.js:84` | `siesa/documentos.js:265` |
+| Factura electrónica: régimen | `tercero.fe_regimen_natural` | 49 | Régimen de la persona natural (49 = No responsable de IVA). | `parametros.js:85` | `siesa/documentos.js:358` |
+| Factura electrónica: obligación | `tercero.fe_obligacion_natural` | R-99-PN | Obligación de la persona natural. | `parametros.js:86` | `siesa/documentos.js:359` |
+| Factura electrónica: detalle tributario 1 | `tercero.fe_detalle1_natural` | ZZ | Detalle tributario 1 de la persona natural (ZZ = No aplica). | `parametros.js:87` | `siesa/documentos.js:360` |
+| Factura electrónica: detalle tributario 2 | `tercero.fe_detalle2_natural` | (vacío) | Vacío = no se envía. | `parametros.js:88` | `siesa/documentos.js:361` |
+| Factura electrónica empresa: régimen | `tercero.fe_regimen_juridica` | 48 | Régimen de la empresa (48 = Responsable de IVA). | `parametros.js:89` | `siesa/documentos.js:358` |
+| Factura electrónica empresa: obligación | `tercero.fe_obligacion_juridica` | R-99-PN | Obligación de la empresa. | `parametros.js:90` | `siesa/documentos.js:359` |
+| Factura electrónica empresa: detalle tributario 1 | `tercero.fe_detalle1_juridica` | 01 | Detalle tributario 1 de la empresa (01 = IVA). | `parametros.js:91` | `siesa/documentos.js:360` |
+| Factura electrónica empresa: detalle tributario 2 | `tercero.fe_detalle2_juridica` | (vacío) | Vacío = no se envía. | `parametros.js:92` | `siesa/documentos.js:361` |
 
 ## Pestaña "Mercado Libre"
 
@@ -116,12 +116,12 @@ clientes. Cámbielos solo con indicación de sistemas.
 | Pendientes por producto | `pedido.ind_backorder_linea` | 5 | SIESA solo acepta 5. | `parametros.js:56` | `siesa/documentos.js:148` |
 | Sucursal del cliente | `pedido.sucursal` | 001 | Sucursal a la que se factura. | `parametros.js:57` | `siesa/documentos.js:115-116` |
 | Punto de envío | `pedido.punto_envio` | 000 | SIESA rechaza T01. | `parametros.js:60` | `siesa/documentos.js:124` |
-| Moneda | `pedido.moneda` | COP | Moneda del pedido y del cliente. | `parametros.js:61` | `siesa/documentos.js:121-122`, `:259` |
+| Moneda | `pedido.moneda` | COP | Moneda del pedido y del cliente. | `parametros.js:61` | `siesa/documentos.js:121-122`, `:262` |
 | Moneda de conversión | `pedido.moneda_conv` | USD | Moneda de conversión. | `parametros.js:62` | `siesa/documentos.js:121` |
 | Concepto | `pedido.concepto` | 501 | 501 = ventas. | `parametros.js:63` | `siesa/documentos.js:142` |
 | Motivo | `pedido.motivo` | 01 | Motivo de cada producto. | `parametros.js:64` | `siesa/documentos.js:142` |
 | Centro de operación del movimiento | `pedido.co_movto` | 040 | Centro de operación de cada producto. | `parametros.js:65` | `siesa/documentos.js:143` |
-| Centro de costo de respaldo | `pedido.ccosto` | (vacío) | Solo si SIESA no responde con el centro de costo del producto. Vacío = esa venta no se envía. | `parametros.js:68` | `siesa/documentos.js:48`, `procesoVentas.js:106-107` |
+| Centro de costo de respaldo | `pedido.ccosto` | (vacío) | Solo si SIESA no responde con el centro de costo del producto. Vacío = esa venta no se envía. | `parametros.js:68` | `siesa/documentos.js:48`, `procesoVentas.js:129-130` |
 | Centro de costo del flete | `pedido.ccosto_flete` | 5059 | Centro de costo de la línea FLETE. | `parametros.js:70` | `siesa/documentos.js:53` |
 | Unidad de medida | `pedido.unidad` | UND | Unidad de los productos. | `parametros.js:71` | `siesa/documentos.js:145` |
 | Enviar el detalle de impuestos | `pedido.enviar_impuestos` | Apagado | Envía el IVA de cada producto (registro 0432). Apagado = SIESA lo calcula. | `parametros.js:72` | `siesa/documentos.js:154-164` |
@@ -131,19 +131,19 @@ clientes. Cámbielos solo con indicación de sistemas.
 
 | Nombre en pantalla | Clave | Valor original | Campo de SIESA / efecto | Definido en | Actúa en |
 |---|---|---|---|---|---|
-| Sucursal | `tercero.sucursal` | 001 | Sucursal del cliente nuevo. | `parametros.js:95` | `siesa/documentos.js:257`, `:276`, `:289`, `:302` |
-| Calificación | `tercero.calificacion` | A | Obligatoria: vacía, SIESA rechaza el cliente. | `parametros.js:97` | `siesa/documentos.js:259` |
-| País | `tercero.pais` | 169 | 169 = Colombia. | `parametros.js:98` | `siesa/documentos.js:219` |
-| Actualizar datos tributarios | `tercero.actualiza` | 1 | Si el dato ya existe, se actualiza. | `parametros.js:99` | `siesa/documentos.js:275`, `:283`, `:301` |
-| Clasificación del cliente | `tercero.criterios` | CCO:NO, CLM:01, CMV:N, COM:NO, D01:50, D02:52, NIC:NO, PCO:05, PRO:NO, RED:01, ZON:0207 | Un criterio por plan, como `plan:criterio`. D01 y D02 se reemplazan según los productos. | `parametros.js:101` | `siesa/documentos.js:319` |
-| División según los productos | `tercero.division_por_segmento` | AU01:50:52, CO01:50:52, MO01:70:71, NA01:70:71, BI01:80:80 | `segmento del producto:división:segmento del cliente`. Gana el grupo con más valor en la compra. | `parametros.js:104` | `siesa/documentos.js:321-335` |
-| Impuestos persona natural | `tercero.impuestos_natural` | 001:01, 002:01, 003:01 | `clase:valor`. 001 IVA, 002 ICA, 003 INC; 01 = le aplica. | `parametros.js:110` | `siesa/documentos.js:295` |
-| Retenciones persona natural | `tercero.retenciones_natural` | 001:00 … 025:01, 030:00 | `clase:valor`. Solo AUTRENTA (025) como retenedor. | `parametros.js:112` | `siesa/documentos.js:296` |
-| Impuestos empresa | `tercero.impuestos_juridica` | 001:01, 002:01, 003:01 | Igual que persona natural. | `parametros.js:114` | `siesa/documentos.js:295` |
-| Retenciones empresa | `tercero.retenciones_juridica` | 001:00 … 025:01, 030:01 | AUTRENTA (025) y RETNEDOR (030) como retenedor. | `parametros.js:116` | `siesa/documentos.js:296` |
-| Validar bloqueo | `tercero.bloqueado` | 1 | En los clientes reales va en 1 aunque estén activos. | `parametros.js:119` | `siesa/documentos.js:263` |
-| Validar cupo | `tercero.bloqueo_cupo` | 1 | Igual. | `parametros.js:120` | `siesa/documentos.js:263` |
-| Validar mora | `tercero.bloqueo_mora` | 1 | Igual. | `parametros.js:121` | `siesa/documentos.js:264` |
+| Sucursal | `tercero.sucursal` | 001 | Sucursal del cliente nuevo. | `parametros.js:95` | `siesa/documentos.js:260`, `:279`, `:292`, `:305` |
+| Calificación | `tercero.calificacion` | A | Obligatoria: vacía, SIESA rechaza el cliente. | `parametros.js:97` | `siesa/documentos.js:262` |
+| País | `tercero.pais` | 169 | 169 = Colombia. | `parametros.js:98` | `siesa/documentos.js:222` |
+| Actualizar datos tributarios | `tercero.actualiza` | 1 | Si el dato ya existe, se actualiza. | `parametros.js:99` | `siesa/documentos.js:278`, `:286`, `:304` |
+| Clasificación del cliente | `tercero.criterios` | CCO:NO, CLM:01, CMV:N, COM:NO, D01:50, D02:52, NIC:NO, PCO:05, PRO:NO, RED:01, ZON:0207 | Un criterio por plan, como `plan:criterio`. D01 y D02 se reemplazan según los productos. | `parametros.js:101` | `siesa/documentos.js:322` |
+| División según los productos | `tercero.division_por_segmento` | AU01:50:52, CO01:50:52, MO01:70:71, NA01:70:71, BI01:80:80 | `segmento del producto:división:segmento del cliente`. Gana el grupo con más valor en la compra. | `parametros.js:104` | `siesa/documentos.js:324-338` |
+| Impuestos persona natural | `tercero.impuestos_natural` | 001:01, 002:01, 003:01 | `clase:valor`. 001 IVA, 002 ICA, 003 INC; 01 = le aplica. | `parametros.js:110` | `siesa/documentos.js:298` |
+| Retenciones persona natural | `tercero.retenciones_natural` | 001:00 … 025:01, 030:00 | `clase:valor`. Solo AUTRENTA (025) como retenedor. | `parametros.js:112` | `siesa/documentos.js:299` |
+| Impuestos empresa | `tercero.impuestos_juridica` | 001:01, 002:01, 003:01 | Igual que persona natural. | `parametros.js:114` | `siesa/documentos.js:298` |
+| Retenciones empresa | `tercero.retenciones_juridica` | 001:00 … 025:01, 030:01 | AUTRENTA (025) y RETNEDOR (030) como retenedor. | `parametros.js:116` | `siesa/documentos.js:299` |
+| Validar bloqueo | `tercero.bloqueado` | 1 | En los clientes reales va en 1 aunque estén activos. | `parametros.js:119` | `siesa/documentos.js:266` |
+| Validar cupo | `tercero.bloqueo_cupo` | 1 | Igual. | `parametros.js:120` | `siesa/documentos.js:266` |
+| Validar mora | `tercero.bloqueo_mora` | 1 | Igual. | `parametros.js:121` | `siesa/documentos.js:267` |
 
 #### Códigos de impuestos y retenciones (verificados en SIESA Pruebas, 2026-10-14)
 

@@ -48,7 +48,7 @@ de enviar: si la venta ya está en SIESA, no se reenvía.
 |---|---|
 | Tercero a facturar (`f430_id_tercero_fact`) | "Tipo y número de documento" (CC / CE / NIT) |
 | Ítem (`f431_referencia_item`) | SKU (= `f120_referencia`) |
-| Cantidad / precio | Unidades / "Ingresos por productos" ÷ unidades, **pasado a neto** (÷ 1,19) y subido a peso entero |
+| Cantidad / precio | Unidades / "Ingresos por productos" ÷ unidades, **pasado a neto** (÷ 1,19) con 2 decimales, para que el total con IVA en SIESA sea igual a lo cobrado |
 | Línea `FLETE` | "Ingresos por envío" (solo si el comprador pagó envío), en neto |
 | Referencia y Número O.C. (`f430_referencia`, `f430_num_docto_referencia`) | Vacíos. El # de venta va en las notas y por ahí lo busca `CONSULTA_PEDIDO_ML` |
 | Barrio (`f419_id_barrio`, `F015_ID_BARRIO`) | Solo en Bogotá: la localidad, que ML trae en la columna "Ciudad" (Suba, Kennedy...) |

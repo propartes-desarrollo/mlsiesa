@@ -67,5 +67,9 @@ const DETALLES_CORTOS = [
 export function detalleCorto(detalle) {
     const texto = String(detalle || '');
     const corto = DETALLES_CORTOS.find(([re]) => re.test(texto))?.[1] || texto.split('. ')[0];
-    return /no se pudo validar si el comprador tiene RUT/i.test(texto) ? `${corto} - revisar RUT` : corto;
+    const revisar = [
+        /no se pudo validar si el comprador tiene RUT/i.test(texto) && 'revisar RUT',
+        /revisarlos en SIESA antes de facturar/i.test(texto) && 'revisar datos tributarios',
+    ].filter(Boolean);
+    return [corto, ...revisar].join(' - ');
 }

@@ -66,7 +66,7 @@ function Detalle({ v, esAdmin, alVerDocumento }) {
             {v.bloqueos.length > 0 && <Alert color="red" icon={<Ban size={16} />} p="xs"><List size="sm">{v.bloqueos.map((b) => <List.Item key={b}>{b}</List.Item>)}</List></Alert>}
             {v.alertas.length > 0 && <Alert color="yellow" icon={<AlertTriangle size={16} />} p="xs"><List size="sm">{v.alertas.map((a) => <List.Item key={a}>{a}</List.Item>)}</List></Alert>}
             {v.resultado && <Alert color={ESTADOS[v.estado]?.color || 'gray'} p="xs"><Text size="sm">{v.resultado.mensaje}</Text>
-                {v.resultado.terceroCreado && <Text size="sm" fw={500}>Se registró el comprador como cliente nuevo en SIESA{v.resultado.conRut ? ', con NIT (tiene RUT en la DIAN)' : ''}.</Text>}
+                {v.resultado.terceroCreado && <Text size="sm" fw={500}>Se registró el comprador como cliente nuevo en SIESA{v.resultado.conRut ? ', con NIT (tiene RUT en la DIAN)' : ''}{v.resultado.nombreDian ? `, con el nombre registrado en la DIAN: ${v.resultado.nombreDian}` : ''}.</Text>}
                 {esAdmin && v.resultado.pasos?.length > 0 && <Text size="xs" c="dimmed">{v.resultado.pasos.join(' - ')}</Text>}</Alert>}
             {!v.resultado && v.previo && <Text size="xs" c="dimmed">Último envío: {v.previo.detalle} - {fechaHora(v.previo.actualizado_en)}</Text>}
 
@@ -173,7 +173,7 @@ export default function Cargue() {
             actualizar(v.venta, { estado: 'enviando' });
             try {
                 const { data } = await ventasMl.enviar(id, v.venta);
-                actualizar(v.venta, { estado: data.estado, resultado: { mensaje: data.mensaje, pasos: data.pasos, terceroCreado: data.terceroCreado, conRut: data.conRut } });
+                actualizar(v.venta, { estado: data.estado, resultado: { mensaje: data.mensaje, pasos: data.pasos, terceroCreado: data.terceroCreado, conRut: data.conRut, nombreDian: data.nombreDian } });
                 if (data.estado === 'enviada') ok += 1;
             } catch (e) {
                 actualizar(v.venta, { estado: 'con_error', resultado: { mensaje: mensajeError(e), pasos: [] } });

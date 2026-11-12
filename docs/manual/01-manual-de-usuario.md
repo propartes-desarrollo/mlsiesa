@@ -92,7 +92,8 @@ Haga clic en una fila para abrir su detalle:
 - **Tabla de productos**: referencia (SKU), descripción, cantidad, precio con IVA, precio sin IVA
   (el que va a SIESA) y tipo de envío con su bodega (por ejemplo *Colecta - BP150*).
 - **Facturar a**: cómo quedaría el cliente en SIESA (persona natural o empresa, nombres y apellidos
-  separados, dirección).
+  separados, dirección). Es la separación que se hace con el nombre que trae Mercado Libre; si al
+  enviar la DIAN confirma que la persona tiene RUT, se usan los nombres y apellidos del RUT.
 - **Dirección de Envío**: la dirección del comprador, la ciudad, la guía y el tipo de envío.
 
 ### Paso 4. Enviar a SIESA
@@ -107,7 +108,8 @@ luego al resultado (*Enviada*, *Rechazada*, *Con error*, *Esperando DIAN*…). A
 **"N de M venta(s) enviadas a SIESA"**.
 
 Si el comprador no existía en SIESA y se registró, la fila muestra la etiqueta **Cliente nuevo**
-(o **Cliente nuevo - NIT** si tenía RUT en la DIAN).
+(o **Cliente nuevo - NIT** si tenía RUT en la DIAN). En ese caso el detalle de la venta indica el nombre
+con que quedó registrado, tomado del RUT.
 
 ### Paso 5. Ver el pedido en el Historial
 
@@ -220,7 +222,8 @@ Etiquetas adicionales:
 | Tiene descuentos y bonificaciones ($ …). | Confirmar que el valor sea el esperado. |
 | La suma de los productos no coincide con el total del paquete. | Revisar la venta en ML antes de enviar. |
 | La ciudad "…" no está registrada en la app… | Si el comprador es nuevo, quedaría sin ciudad en SIESA. El administrador puede agregar el municipio en Configuración → Municipios. |
-| El comprador es una empresa… | Revisar sus datos tributarios antes de enviar. |
+| Comprador empresa (NIT): si no existe en SIESA, se crea con los datos tributarios estándar para empresas; debe revisarlos en SIESA antes de facturar. | Mercado Libre no informa los datos tributarios de la empresa, así que se crea con los de Configuración → Cliente nuevo. Se puede enviar; el régimen, los impuestos y las retenciones se revisan y ajustan en SIESA **antes de facturar**. |
+| Datos del comprador posiblemente incompletos: en SIESA queda como se cargó… | El nombre trae menos de dos apellidos o palabras de una o dos letras (por ejemplo "Wilson S"). Si la persona tiene RUT, al enviar se usan los nombres y apellidos de la DIAN. Si no, el cliente se crea así y hay que editar el Tercero en SIESA antes de facturar. |
 | El total con IVA en SIESA es distinto de lo cobrado en ML. | Diferencia de redondeo o de IVA. Revisar si es grande. |
 | No se reconoce el tipo de documento del comprador; se toma como cédula. | Confirmar el documento. |
 
@@ -231,6 +234,7 @@ Etiquetas adicionales:
 | Pedido creado | Pedido PML-… creado en SIESA. | Nada. |
 | Ya estaba en SIESA | Esta venta ya estaba en SIESA como pedido PML-…; no se vuelve a enviar. | Nada. No se duplicó. |
 | Encontrado al consultar | Pedido encontrado en SIESA al consultarlo: PML-… | Nada. |
+| Pedido creado - revisar datos tributarios | …Cliente empresa creado con los datos tributarios estándar. Debe revisarlos en SIESA antes de facturar. | Revisar en SIESA el régimen, los impuestos y las retenciones del cliente antes de facturar. |
 | Pedido creado - revisar RUT | …La DIAN no respondió y no se pudo validar si el comprador tiene RUT: se registró con cédula… | Revisar en la DIAN si el comprador tiene RUT; si lo tiene, actualizar el cliente en SIESA. |
 | Producto no existe en SIESA | El producto … no existe en SIESA. Revise el SKU… | Corregir el SKU en ML o crear el ítem en SIESA, y reenviar. |
 | Sin datos del producto | No se pudo obtener la información del producto… | Reintentar en unos minutos. |
@@ -265,7 +269,8 @@ Todo lo que se envía a SIESA va en **MAYÚSCULAS**, salvo los correos, que van 
 
 ### Qué datos lleva el cliente nuevo
 
-- Persona natural o empresa, con nombres y apellidos separados (o razón social).
+- Persona natural o empresa, con nombres y apellidos separados (o razón social). Si la persona tiene
+  RUT, los nombres y apellidos son los del RUT; si no, salen del nombre de Mercado Libre.
 - Dirección, ciudad (código DANE) y, en Bogotá, la localidad como barrio.
 - Vendedor y cobrador 0600, condición C08, tipo de cliente 6000, lista L04, calificación A,
   centro de operación de ventas 040, nota *CREADO EN MERCADOLIBRE*.
@@ -280,7 +285,7 @@ pública de la DIAN si tiene RUT:
 
 | Respuesta de la DIAN | Cómo se registra |
 |---|---|
-| Tiene RUT | Con **NIT** (tipo N) y su dígito de verificación, como persona natural |
+| Tiene RUT | Con **NIT** (tipo N) y su dígito de verificación, como persona natural, y con los **nombres y apellidos registrados en el RUT** |
 | No tiene RUT | Con **cédula** |
 | No responde | La venta queda **Esperando DIAN** y no se escribe nada en SIESA |
 
