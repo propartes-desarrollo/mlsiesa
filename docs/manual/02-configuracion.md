@@ -79,7 +79,7 @@ busque en el archivo la **clave** del valor (por ejemplo `'pedido.co'`).
 | Teléfono de los clientes nuevos | `tercero.telefono_respaldo` | (vacío) | Teléfono del cliente y del envío. Vacío = sin teléfono. | `parametros.js:78` | `siesa/documentos.js:129`, `:223` |
 | Vendedor y cobrador | `tercero.vendedor` | 0600 | Vendedor y cobrador del cliente nuevo. | `parametros.js:79` | `siesa/documentos.js:262`, `:271` |
 | Condición de pago | `tercero.cond_pago` | C08 | Condición de pago del cliente nuevo. | `parametros.js:80` | `siesa/documentos.js:263` |
-| Centro de operación de ventas | `tercero.co_movto` | 040 | Centro de operación de "Parámetros default movimiento de ventas" del cliente. | `parametros.js:81` | `siesa/documentos.js:272` |
+| Centro de operación de ventas | `tercero.co_movto` | (vacío) | Centro de operación de "Parámetros default movimiento de ventas" del cliente. Vacío = el campo se envía en blanco y SIESA no asigna ninguno. | `parametros.js:81` | `siesa/documentos.js:272` |
 | Nota del cliente nuevo | `tercero.notas` | Creado en Mercadolibre | Observación del cliente en SIESA (llega en mayúsculas). | `parametros.js:82` | `siesa/documentos.js:271` |
 | Margen máximo (%) | `tercero.porc_max_margen` | 100 | Margen máximo del cliente (llega como 0100.00). | `parametros.js:84` | `siesa/documentos.js:265` |
 | Factura electrónica: régimen | `tercero.fe_regimen_natural` | 49 | Régimen de la persona natural (49 = No responsable de IVA). | `parametros.js:85` | `siesa/documentos.js:358` |

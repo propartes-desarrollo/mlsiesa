@@ -168,7 +168,7 @@ Si el comprador no existe en SIESA, la app lo crea en un solo documento, antes d
 | Registro | Qué crea |
 |---|---|
 | `0200` | El tercero (nombres y apellidos separados, ciudad DANE) |
-| `0201` | El cliente, sucursal `001`: vendedor/cobrador `0600`, `C08`, tipo `6000`, lista `L04`, calificación `A` (obligatoria), margen máximo `0100.00`, nota `CREADO EN MERCADOLIBRE`, centro de operación del movimiento de ventas `040` |
+| `0201` | El cliente, sucursal `001`: vendedor/cobrador `0600`, `C08`, tipo `6000`, lista `L04`, calificación `A` (obligatoria), margen máximo `0100.00`, nota `CREADO EN MERCADOLIBRE`, centro de operación del movimiento de ventas en blanco |
 | `0207` | Clasificación, un registro por plan (Configuración → Avanzado): `CCO:NO`, `CLM:01`, `CMV:N`, `COM:NO`, `NIC:NO`, `PCO:05`, `PRO:NO`, `RED:01`, `ZON:0207`. División (`D01`) y segmento (`D02`) según el segmento S01 de los productos que más pesan en la compra, por valor: AU01/CO01 → `50`/`52` Automotriz, MO01/NA01 → `70`/`71` Motos, BI01 → `80`/`80` Bicicletas. Si no se sabe, `50`/`52`. El segmento lo trae `CONSULTA_ITEM_ML` |
 | `0753` x3 | Facturación electrónica 2.1 (persona natural): régimen `49`, obligación `R-99-PN`, detalle tributario 1 `ZZ` (el detalle tributario 2 no se envía) |
 | `0753` x1 | Correo FE del cliente: `tienda.virtual@propartes.com` (ML no entrega el correo del comprador) |

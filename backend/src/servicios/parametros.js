@@ -78,7 +78,7 @@ const DEFINICIONES = [
     ['tercero.telefono_respaldo', '', 'texto', 'Teléfono de los clientes nuevos', 'Mercado Libre no entrega el teléfono del comprador. Vacío = sin teléfono.'],
     ['tercero.vendedor', '0600', 'texto', 'Vendedor y cobrador', 'Vendedor y cobrador asignados al cliente nuevo (MERCADO LIBRE).'],
     ['tercero.cond_pago', 'C08', 'texto', 'Condición de pago', 'Condición de pago del cliente nuevo.'],
-    ['tercero.co_movto', '040', 'texto', 'Centro de operación de ventas', 'Centro de operación por defecto del movimiento de ventas del cliente nuevo.'],   // F201_ID_CO_MOVTO_FACTURA
+    ['tercero.co_movto', '', 'texto', 'Centro de operación de ventas', 'Centro de operación de los parámetros por defecto del movimiento de ventas del cliente nuevo. Vacío = el campo se envía en blanco y SIESA no asigna ninguno.'],   // F201_ID_CO_MOVTO_FACTURA
     ['tercero.notas', 'Creado en Mercadolibre', 'texto', 'Nota del cliente nuevo', 'Observación que queda en el cliente creado desde la app.'],   // F201_NOTAS
     // F201_PORC_MAX_MARGEN: entre el margen mínimo (0) y 9999. El ejemplo de TI trae 100.
     ['tercero.porc_max_margen', 100, 'numero', 'Margen máximo (%)', 'Porcentaje de margen máximo del cliente nuevo.'],

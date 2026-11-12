@@ -177,7 +177,8 @@ describe('documentos', () => {
         assert.equal(campo(L.L201, lineas[2], 'f201_porc_tolerancia'), '0000.00');
         assert.equal(campo(L.L200, lineas[1], 'F200_ID_TIPO_IDENT'), 'C');
         assert.equal(campo(L.L201, lineas[2], 'F201_NOTAS').trim(), 'CREADO EN MERCADOLIBRE');
-        assert.equal(campo(L.L201, lineas[2], 'F201_ID_CO_MOVTO_FACTURA'), '040');
+        // Parámetros default del movimiento de ventas: el centro de operación va en blanco.
+        assert.equal(campo(L.L201, lineas[2], 'F201_ID_CO_MOVTO_FACTURA'), '   ');
         // Fuera de Bogotá no se envía barrio.
         assert.equal(campo(L.L200, lineas[1], 'F015_ID_BARRIO').trim(), '');
         // Impuestos y retenciones con clase de 3 dígitos y valor de 2, como la plantilla 004 de TI.
