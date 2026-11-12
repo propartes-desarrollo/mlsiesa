@@ -3,10 +3,12 @@
 // ================================================================
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Stack, Title, Text, Paper, Group, Table, Badge, Anchor, Pagination } from '@mantine/core';
+import { Stack, Title, Text, Paper, Group, Table, Badge, Anchor, Pagination, Select, Button } from '@mantine/core';
 import { Dropzone } from '@mantine/dropzone';
+import { DatePickerInput } from '@mantine/dates';
+import dayjs from 'dayjs';
 import { notifications } from '@mantine/notifications';
-import { FileSpreadsheet, Upload, X } from 'lucide-react';
+import { FileSpreadsheet, Upload, X, Calendar, User } from 'lucide-react';
 import '@mantine/dropzone/styles.css';
 import { ventasMl, mensajeError } from '../api/indice';
 import { fechaHora } from '../utilidades/formato';
@@ -20,14 +22,24 @@ export default function CargarVentas() {
     const [total, setTotal] = useState(0);
     const [pagina, setPagina] = useState(1);
     const [subiendo, setSubiendo] = useState(false);
+    const [fechas, setFechas] = useState([null, null]);
+    const [cargadoPor, setCargadoPor] = useState(null);
+    const [quienes, setQuienes] = useState([]);
+    const dia = (f) => (f ? dayjs(f).format('YYYY-MM-DD') : undefined);
+    const conFiltros = Boolean(fechas[0] || cargadoPor);
 
+    // Con solo la fecha inicial elegida, se filtra ese día.
+    const filtros = { desde: dia(fechas[0]), hasta: dia(fechas[1] || fechas[0]), cargadoPor: cargadoPor || undefined };
     useEffect(() => {
-        ventasMl.listarCargues(pagina, POR_PAGINA)
-            .then(({ data }) => { setCargues(data.cargues); setTotal(data.total); })
+        ventasMl.listarCargues({ pagina, porPagina: POR_PAGINA, ...filtros })
+            .then(({ data }) => { setCargues(data.cargues); setTotal(data.total); setQuienes(data.usuarios); })
             .catch(() => {});
-    }, [pagina]);
+    }, [pagina, fechas, cargadoPor]);   // eslint-disable-line react-hooks/exhaustive-deps
     const paginas = Math.max(1, Math.ceil(total / POR_PAGINA));
     const desde = (pagina - 1) * POR_PAGINA + 1;
+    // Al cambiar un filtro, la lista vuelve a la primera página.
+    const filtrar = (poner) => (valor) => { poner(valor); setPagina(1); };
+    const limpiar = () => { setFechas([null, null]); setCargadoPor(null); setPagina(1); };
 
     async function subir(archivos) {
         if (!archivos.length) return;
@@ -68,7 +80,16 @@ export default function CargarVentas() {
                     <Text fw={700}>Archivos cargados</Text>
                     {total > 0 && <Text size="xs" c="dimmed">{desde}-{Math.min(desde + cargues.length - 1, total)} de {total}</Text>}
                 </Group>
-                {cargues.length === 0 ? <Text c="dimmed" size="sm">Todavía no se ha cargado ningún archivo.</Text> : (
+                <Group mb="sm" gap="sm">
+                    <DatePickerInput type="range" placeholder="Fecha de carga" value={fechas} onChange={filtrar(setFechas)} clearable allowSingleDateInRange
+                        valueFormat="DD MMM YYYY" maxDate={new Date()} leftSection={<Calendar size={16} />} w={260} />
+                    <Select placeholder="Cargado por" clearable value={cargadoPor} onChange={filtrar(setCargadoPor)} w={240}
+                        leftSection={<User size={16} />} data={quienes.map((u) => ({ value: u.id, label: u.nombre }))} />
+                    {conFiltros && <Button variant="subtle" size="xs" onClick={limpiar}>Quitar filtros</Button>}
+                </Group>
+                {cargues.length === 0 ? (
+                    <Text c="dimmed" size="sm">{conFiltros ? 'No hay archivos con estos filtros.' : 'Todavía no se ha cargado ningún archivo.'}</Text>
+                ) : (
                     <Table.ScrollContainer minWidth={600}>
                         <Table highlightOnHover verticalSpacing="xs">
                             <Table.Thead><Table.Tr>

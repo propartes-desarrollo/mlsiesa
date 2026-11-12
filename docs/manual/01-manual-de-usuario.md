@@ -131,6 +131,16 @@ al más antiguo. Arriba a la derecha indica cuántos hay (por ejemplo *1-10 de 4
 página al final de la lista para ir a días anteriores. La columna **Enviadas** muestra cuántas ventas
 de cada archivo ya están en SIESA (por ejemplo *30 / 32*).
 
+Con muchos archivos, use los dos filtros que están sobre la lista:
+
+- **Fecha de carga**: abre un calendario y permite elegir un día o un rango (desde-hasta). Se borra
+  con la "x".
+- **Cargado por**: muestra solo los archivos que subió esa persona. La lista incluye únicamente a
+  quienes han cargado algún archivo.
+
+Los dos se pueden combinar, por ejemplo los archivos que subió una persona la semana pasada. Al
+aplicar un filtro, la lista vuelve a la primera página; **Quitar filtros** los borra todos.
+
 ### Cómo buscar un envío por fecha, comprador o pedido
 
 En **Historial de envíos**:

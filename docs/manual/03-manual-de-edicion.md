@@ -110,7 +110,7 @@ Pruebas** con el script de la sección 13.
 | `Aplicacion.jsx` | Rutas de la aplicación y permisos por rol (28-36). | 41 |
 | `componentes/Plantilla.jsx` | Marco general: barra superior, indicadores (19-37) y menú (12-17). | 88 |
 | `paginas/InicioSesion.jsx` | Pantalla de ingreso. | 46 |
-| `paginas/CargarVentas.jsx` | **Cargar ventas**: recuadro de carga y lista paginada de archivos. | 98 |
+| `paginas/CargarVentas.jsx` | **Cargar ventas**: recuadro de carga y lista de archivos, paginada y con filtros. | 119 |
 | `paginas/Cargue.jsx` | **Detalle de un archivo**: resumen, tabla de ventas, detalle y envío. | 322 |
 | `paginas/Historial.jsx` | **Historial de envíos**: filtros, tabla y detalle del envío. | 246 |
 | `paginas/Parametros.jsx` | **Configuración**: pestañas, municipios y conexión. | 212 |
@@ -139,7 +139,7 @@ Seguir este recorrido ayuda a saber dónde está cada regla.
 
 | Paso | Qué pasa | Dónde |
 |---|---|---|
-| 1. Subir el Excel | La pantalla envía el archivo. | `frontend/src/paginas/CargarVentas.jsx:32-42` |
+| 1. Subir el Excel | La pantalla envía el archivo. | `frontend/src/paginas/CargarVentas.jsx:44-54` |
 | 2. Recibirlo | Valida que sea `.xlsx` de hasta 10 MB y lo guarda como "cargue". | `backend/src/rutas/ventasMl.js:26-32`, `:60-74` |
 | 3. Leer el Excel | Ubica las columnas por nombre, agrupa paquetes y arma cada venta con sus avisos y bloqueos. | `backend/src/servicios/excelMl.js:178-218` y `:222-307` |
 | 4. Revisar cada venta | Aplica bloqueos y avisos con la configuración **actual**. | `backend/src/servicios/procesoVentas.js:53-113` |
@@ -175,19 +175,29 @@ Seguir este recorrido ayuda a saber dónde está cada regla.
 
 | Texto | Archivo y línea | Buscar |
 |---|---|---|
-| Título | `frontend/src/paginas/CargarVentas.jsx:47` | `Cargar ventas de Mercado Libre` |
-| Descripción | `CargarVentas.jsx:49` | `Suba el archivo de ventas` |
-| Recuadro de carga | `CargarVentas.jsx:60-61` | `Arrastre aquí el Excel de ventas` |
-| Mensaje de archivo rechazado | `CargarVentas.jsx:53` | `Solo se acepta el archivo de Excel` |
-| Título de la lista | `CargarVentas.jsx:68` | `Archivos cargados` |
-| Columnas de la lista | `CargarVentas.jsx:75-76` | `<Table.Th>Archivo</Table.Th>` |
+| Título | `frontend/src/paginas/CargarVentas.jsx:59` | `Cargar ventas de Mercado Libre` |
+| Descripción | `CargarVentas.jsx:61` | `Suba el archivo de ventas` |
+| Recuadro de carga | `CargarVentas.jsx:72-73` | `Arrastre aquí el Excel de ventas` |
+| Mensaje de archivo rechazado | `CargarVentas.jsx:65` | `Solo se acepta el archivo de Excel` |
+| Título de la lista | `CargarVentas.jsx:80` | `Archivos cargados` |
+| Columnas de la lista | `CargarVentas.jsx:96-97` | `<Table.Th>Archivo</Table.Th>` |
+| Filtros de la lista (fecha de carga y cargado por) | `CargarVentas.jsx:83-89` | `placeholder="Fecha de carga"` |
+| Mensaje cuando los filtros no encuentran nada | `CargarVentas.jsx:92` | `No hay archivos con estos filtros.` |
 
 ### 4.4 Cambiar cuántos archivos se ven por página
 
 | | |
 |---|---|
-| **Archivo** | `frontend/src/paginas/CargarVentas.jsx`, línea 15. Buscar: `const POR_PAGINA = 10;` |
+| **Archivo** | `frontend/src/paginas/CargarVentas.jsx`, línea 17. Buscar: `const POR_PAGINA = 10;` |
 | **Qué cambiar** | El número. El servidor acepta hasta 100 (`backend/src/rutas/ventasMl.js:80`). |
+
+### 4.4.1 Cambiar o quitar los filtros de los archivos cargados
+
+| | |
+|---|---|
+| **Pantalla** | `frontend/src/paginas/CargarVentas.jsx:83-89`: el calendario (fecha de carga) y la lista de quién cargó. Al cambiar un filtro, la lista vuelve a la primera página (línea 41). |
+| **Servidor** | `backend/src/rutas/ventasMl.js:78-110`: los parámetros `desde`, `hasta` y `cargadoPor`, y la consulta que los aplica. La lista de quienes han cargado sale de la misma consulta (líneas 102-103). |
+| **Fechas** | Se comparan en hora de Colombia, igual que en el Historial. |
 
 ### 4.5 Cambiar los textos del detalle de un archivo
 

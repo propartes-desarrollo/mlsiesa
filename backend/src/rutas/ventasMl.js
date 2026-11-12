@@ -75,22 +75,34 @@ router.post('/cargues', requiereRol('admin', 'usuario'), subida.single('archivo'
 
 // GET /api/ventas-ml/cargues
 // Paginado, del más reciente al más antiguo: ?pagina=1&porPagina=10
+// Filtros: ?desde=&hasta= (fechas AAAA-MM-DD de carga, hora de Colombia) y ?cargadoPor=
+// Devuelve también quiénes han cargado archivos, para el filtro de la pantalla.
 router.get('/cargues', [
     query('pagina').optional().isInt({ min: 1 }),
     query('porPagina').optional().isInt({ min: 1, max: 100 }),
+    query('desde').optional({ values: 'falsy' }).isISO8601({ strict: true }),
+    query('hasta').optional({ values: 'falsy' }).isISO8601({ strict: true }),
+    query('cargadoPor').optional({ values: 'falsy' }).isUUID(),
 ], validar, async (req, res, next) => {
     try {
         const porPagina = Number(req.query.porPagina) || 10;
         const pagina = Number(req.query.pagina) || 1;
-        const [{ rows }, total] = await Promise.all([
+        const filtros = [req.query.desde || null, req.query.hasta || null, req.query.cargadoPor || null];
+        const donde = `WHERE ($1::date IS NULL OR (c.creado_en AT TIME ZONE 'America/Bogota')::date >= $1::date)
+                         AND ($2::date IS NULL OR (c.creado_en AT TIME ZONE 'America/Bogota')::date <= $2::date)
+                         AND ($3::uuid IS NULL OR c.cargado_por = $3::uuid)`;
+        const [{ rows }, total, quienes] = await Promise.all([
             consulta(
                 `SELECT c.id, c.archivo, c.total_ventas, c.creado_en, u.nombre AS cargado_por,
                         (SELECT COUNT(*) FROM envios e WHERE e.cargue_id = c.id AND e.estado = 'importado')::int AS importadas
                    FROM cargues c LEFT JOIN usuarios u ON u.id = c.cargado_por
-                  ORDER BY c.creado_en DESC LIMIT $1 OFFSET $2`, [porPagina, (pagina - 1) * porPagina]),
-            consulta('SELECT COUNT(*)::int AS n FROM cargues'),
+                  ${donde}
+                  ORDER BY c.creado_en DESC LIMIT $4 OFFSET $5`, [...filtros, porPagina, (pagina - 1) * porPagina]),
+            consulta(`SELECT COUNT(*)::int AS n FROM cargues c ${donde}`, filtros),
+            consulta(
+                `SELECT DISTINCT u.id, u.nombre FROM cargues c JOIN usuarios u ON u.id = c.cargado_por ORDER BY u.nombre`),
         ]);
-        res.json({ exito: true, cargues: rows, total: total.rows[0].n, pagina, porPagina });
+        res.json({ exito: true, cargues: rows, total: total.rows[0].n, pagina, porPagina, usuarios: quienes.rows });
     } catch (error) { next(error); }
 });
 
