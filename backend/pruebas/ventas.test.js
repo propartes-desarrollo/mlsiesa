@@ -250,8 +250,8 @@ describe('documentos', () => {
     test('alerta de nombre incompleto y aviso de empresa', async () => {
         const v = (await excelMl.leer(R0928))[0];
         const alertas = (nombre, juridica = false) => proceso.vistaPrevia({ ...v, comprador: { ...v.comprador, nombre, juridica, tipoDoc: juridica ? 'N' : 'C' } }, cfgBase()).alertas;
-        const incompleto = (n) => alertas(n).find((a) => a.startsWith('Datos del comprador posiblemente incompletos:'));
-        assert.match(incompleto('Wilson S'), /hay que editar el Tercero antes de facturar/);
+        const incompleto = (n) => alertas(n).find((a) => a.startsWith('Datos del comprador posiblemente incompletos.'));
+        assert.match(incompleto('Wilson S'), /corregir el tercero en SIESA antes de facturar/);
         for (const n of ['Wilson Suarez', 'Wilson']) assert.ok(incompleto(n), n);
         assert.equal(incompleto('Wilson Andres Suarez Mora'), undefined);
         assert.equal(incompleto('Wilson Suarez Mora'), undefined);

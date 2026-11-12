@@ -67,7 +67,7 @@ function vistaPrevia(venta, cfg, previo = null, municipios = {}) {
     if (tercero && tercero.tipo === documentos.NATURAL) {
         const falta = nombreIncompleto(tercero);
         if (falta) {
-            alertas.push('Datos del comprador posiblemente incompletos: en SIESA queda como se cargó. Si tiene RUT, al enviar se usan los nombres y apellidos de la DIAN; si no, el cliente se crea así y hay que editar el Tercero antes de facturar.');
+            alertas.push('Datos del comprador posiblemente incompletos. El nombre llega así desde Mercado Libre: si el comprador está inscrito en el RUT se usan los nombres y apellidos de la DIAN; si no, hay que corregir el tercero en SIESA antes de facturar.');
         }
     }
     const idBodega = documentos.bodega(venta, cfg);

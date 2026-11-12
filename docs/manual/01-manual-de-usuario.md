@@ -233,7 +233,7 @@ Etiquetas adicionales:
 | La suma de los productos no coincide con el total del paquete. | Revisar la venta en ML antes de enviar. |
 | La ciudad "…" no está registrada en la app… | Si el comprador es nuevo, quedaría sin ciudad en SIESA. El administrador puede agregar el municipio en Configuración → Municipios. |
 | Comprador empresa (NIT): si no existe en SIESA, se crea con los datos tributarios estándar para empresas; debe revisarlos en SIESA antes de facturar. | Mercado Libre no informa los datos tributarios de la empresa, así que se crea con los de Configuración → Cliente nuevo. Se puede enviar; el régimen, los impuestos y las retenciones se revisan y ajustan en SIESA **antes de facturar**. |
-| Datos del comprador posiblemente incompletos: en SIESA queda como se cargó… | El nombre trae menos de dos apellidos o palabras de una o dos letras (por ejemplo "Wilson S"). Si la persona tiene RUT, al enviar se usan los nombres y apellidos de la DIAN. Si no, el cliente se crea así y hay que editar el Tercero en SIESA antes de facturar. |
+| Datos del comprador posiblemente incompletos. El nombre llega así desde Mercado Libre… | El nombre trae menos de dos apellidos o palabras de una o dos letras (por ejemplo "Wilson S"). Si la persona tiene RUT, al enviar se usan los nombres y apellidos de la DIAN. Si no, el cliente se crea así y hay que editar el Tercero en SIESA antes de facturar. |
 | El total con IVA en SIESA es distinto de lo cobrado en ML. | Diferencia de redondeo o de IVA. Revisar si es grande. |
 | No se reconoce el tipo de documento del comprador; se toma como cédula. | Confirmar el documento. |
 
